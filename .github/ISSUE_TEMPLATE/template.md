@@ -8,7 +8,7 @@ assignees: HyeonHoLe2
 ---
 
 ## 📌 이슈 설명
-이슈 내용에 대해 간단히 설명해주세요
+이슈 테스트
 
 ## ☑️ Todo
 - [ ] TODO
