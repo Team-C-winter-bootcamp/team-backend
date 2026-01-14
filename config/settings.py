@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     # Local apps
     'users',
     'webhooks',
+    'chats',
 ]
 
 MIDDLEWARE = [
