@@ -2,7 +2,8 @@ from django.db import models
 
 
 class Session(models.Model):
-    user_id = models.IntegerField(null=False)
+  #  clerk_user_id = models.CharField(max_length=50,null=False) 테스트용
+    clerk_user_id = models.IntegerField(null=False)
     title = models.CharField(max_length=50, null=False)
     bookmark = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
