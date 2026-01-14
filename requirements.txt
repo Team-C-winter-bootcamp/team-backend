@@ -26,3 +26,9 @@ PyYAML==6.0.3
 uritemplate==4.2.0
 inflection==0.5.1
 packaging==25.0
+
+#clerk
+svix==1.38.0
+
+
+requests==2.32.5
