@@ -2,6 +2,7 @@ from django.db import models
 
 
 class Session(models.Model):
+  #  clerk_user_id = models.CharField(max_length=50,null=False) 테스트용
     clerk_user_id = models.IntegerField(null=False)
     title = models.CharField(max_length=50, null=False)
     bookmark = models.BooleanField(default=False)
