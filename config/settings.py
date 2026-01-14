@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'chats',
     'drf_yasg',
+    'chats',
 ]
 
 MIDDLEWARE = [
