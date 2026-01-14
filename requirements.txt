@@ -6,3 +6,4 @@ drf-yasg==1.21.8
 gunicorn==23.0.0
 packaging==24.2
 sqlparse==0.5.3
+requests==2.32.5
