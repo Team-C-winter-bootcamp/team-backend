@@ -89,7 +89,6 @@ class ChatAIView(APIView):
         if not target_id or not new_content:
             return Response({"error": "message_id와 message가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-<<<<<<< HEAD
         # 1. 원본 유저 메시지 객체 가져오기 (삭제되지 않은 것만)
         original_user_msg = get_object_or_404(
             Message, id=target_id, role='user', is_deleted=False
@@ -105,7 +104,5 @@ class ChatAIView(APIView):
             "message": "메시지가 성공적으로 교체되었습니다.",
             "data": AIChatResponseSerializer(new_ai_msg).data
         }, status=status.HTTP_200_OK)
-=======
         except Session.DoesNotExist:
             return Response({"status": "error", "message": "세션을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
->>>>>>> 720e822143fbd18378afdaca781b4d3eedfef372
