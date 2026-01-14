@@ -53,7 +53,7 @@ def clerk_webhook(request):
             "svix-timestamp": svix_timestamp,
             "svix-signature": svix_signature,
         })
-    except WebhookVerificationError:
+    except (WebhookVerificationError, AttributeError):
         logger.warning("Clerk 웹훅 검증에 실패했습니다.")
         return HttpResponse("웹훅 검증에 실패했습니다.", status=401)
 
@@ -69,12 +69,13 @@ def clerk_webhook(request):
                 logger.error(f"user.created 이벤트에 이메일이 없습니다. Clerk ID: {data['id']}")
                 return HttpResponse("이메일 주소가 없어 사용자를 생성할 수 없습니다.", status=400)
             
-            User.objects.create(
-                clerk_id=data["id"],
+            # 이메일이 존재하면 업데이트, 없으면 생성 (Upsert)
+            User.objects.update_or_create(
                 email=email,
-                first_name=data.get("first_name"),
-                last_name=data.get("last_name"),
-                image_url=data.get("image_url"),
+                defaults={
+                    'clerk_id': data["id"],
+                    'is_deleted': False,  # 사용자 재활성화
+                }
             )
         
         elif event_type == "user.updated":
@@ -82,16 +83,13 @@ def clerk_webhook(request):
             email = _get_primary_email(data)
             if email:
                 user.email = email
-            user.first_name = data.get("first_name")
-            user.last_name = data.get("last_name")
-            user.image_url = data.get("image_url")
             user.save()
 
         elif event_type == "user.deleted":
             clerk_id_to_delete = data.get("id")
             if clerk_id_to_delete:
-                # is_active를 False로 설정하여 Soft Delete 처리
-                User.objects.filter(clerk_id=clerk_id_to_delete).update(is_active=False)
+                # is_deleted를 True로 설정하여 Soft Delete 처리
+                User.objects.filter(clerk_id=clerk_id_to_delete).update(is_deleted=True)
 
     except User.DoesNotExist:
         logger.warning(f"업데이트/삭제하려는 사용자를 찾을 수 없습니다. Clerk ID: {data.get('id')}")
