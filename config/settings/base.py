@@ -17,9 +17,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "corsheaders",
-    "post",
     "rest_framework",
     "drf_yasg",
+    "users",
+    "webhooks",
+    "chats",
 ]
 
 MIDDLEWARE = [

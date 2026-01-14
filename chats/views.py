@@ -1,9 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import ChatSession
-
-
 def ok(data, message="채팅 세션 목록을 성공적으로 가져왔습니다."):
     return Response(
         {
@@ -46,7 +43,7 @@ class SessionListView(APIView):
         clerk_user_id = token
 
         sessions = (
-            ChatSession.objects
+            Session.objects
             .filter(clerk_user_id=clerk_user_id)
             .order_by("-id")
         )
