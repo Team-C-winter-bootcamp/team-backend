@@ -1,102 +1,196 @@
-class Create_session(APIView):
-       @swagger_auto_schema(
-           operation_summary="채팅 생성 API",
-           operation_description="Create new chat",
-           request_body=CreateSessionSerializer,
-           responses ={
-               201: openapi.Response(
-                   description="채팅 생성 성공",
-                   examples={
-                        "application/json": {
-                            "status" : "success",
-                            "code": "COMMON_201",
-                            "messages":"새로운 채팅 세션이 생성되었습니다.",
-                            "data": {
-                                "session_id" : 123,
-                                "title": "임대차 계약 관련 상담"
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
-                            }
-                        }
-                  }
-               ),
-               401: openapi.Response(
-                    description="채팅 메세지가 없어서 채팅 생성 실패",
-                    examples={
-                        "application/json": {
-                            "status" : "error",
-                            "code": "ERR_400",
-                            "messages" : "첫 메세지가 필요합니다",
-                            "data" : null
-                       }
+from .models import Session, Message
+from .services import ChatService
+from .serializers import AIChatResponseSerializer, CreateSessionSerializer
+
+def get_clerk_user_id(request):
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    return auth.split("Bearer ", 1)[1].strip()
+
+
+class CreateSessionView(APIView):
+    @swagger_auto_schema(
+        operation_summary="채팅 생성 API",
+        operation_description="새로운 채팅 세션 생성",
+        request_body=CreateSessionSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                name='Authorization',
+                in_=openapi.IN_HEADER,
+                description='Bearer 토큰',
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            201: openapi.Response(
+                description="채팅 생성 성공",
+                examples={
+                    "application/json": {
+                        "status": "success",
+                        "code": "COMMON_201",
+                        "message": "새로운 채팅 세션이 생성되었습니다.",
+                        "data": {"session_id": 123, "title": "임대차 계약 관련 상담"}
                     }
-               ),
-               404: openapi.Response(
-                   description="관련 데이터 못참음",
-                    examples={
-                        "application/json": {
-                            "status" : "error",
-                            "code" : "RAG_404",
-                            "messages" : "질문하신 내용과 관련된 법률 데이터를 찾지 못했습니다.",
-                            "data" : null
-                        }
+                }
+            ),
+            400: openapi.Response(
+                description="첫 메시지 누락",
+                examples={
+                    "application/json": {
+                        "status": "error",
+                        "code": "ERR_400",
+                        "message": "첫 메시지가 필요합니다."
                     }
-               ),
-               405: openapi.Response(
-                   description="지원 하지 않는 메서드",
-                   examples={
-                        "application/json": {
-                            "status" : "error",
-                            "code" : "ERR_405",
-                            "messages": "지원하지 않는 요청 메서드입니다."
-                        }
+                }
+            ),
+            401: openapi.Response(
+                description="인증 토큰 없음",
+                examples={
+                    "application/json": {
+                        "status": "error",
+                        "code": "ERR_401",
+                        "message": "인증 토큰이 필요합니다."
                     }
-               ),
-               504: openapi.Response(
-                   description="시간 지연 오류",
-                   examples={
-                       "application/json": {
-                           "status" : "error",
-                           "code" : "ERR_504",
-                           "messages" : "AI 변호사가 분석하는데 시간이 오래 걸리고 있습니다."
-                       }
+                }
+            )
+        }
+    )
+    def post(self, request):
+        clerk_id = get_clerk_user_id(request)
+        if not clerk_id:
+            return Response({
+                "status": "error",
+                "code": "ERR_401",
+                "message": "인증 토큰이 필요합니다."
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
-                   }
-
-               )
-
-          }
-       )
-       def post(self, request, *args, **kwargs):
-
-           messages= request.data.get("messages")
-
-           if not messages:
-            response_data ={
+        user_first_message = request.data.get("message")
+        if not user_first_message:
+            return Response({
                 "status": "error",
                 "code": "ERR_400",
-                "messages" : "첫 메세지가 필요합니다."
-            }
-            logger.warning(f"{client_ip} POST /sessions 400 BAD Resquest: 필수 데이터 누락")
-            return Response(data=response_data, status=status.HTTP_400_BAD_REQUEST)
+                "message": "채팅을 시작할 메시지 내용이 필요합니다."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
+        # 1. Ollama를 통해 제목 생성
+        generated_title = ChatService.generate_session_title(user_first_message)
 
-
-
-def patch(self, request, session_id=None, message_id=None):
-    target_id = message_id or request.data.get("message_id")
-    new_content = request.data.get("message")
-
-    if not target_id or not new_content:
-        return Response({"error": "message_id와 message가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        # 1. 원본 유저 메시지 객체 가져오기 (삭제되지 않은 것만)
-        original_user_msg = get_object_or_404(
-            Message, id=target_id, role='user', is_deleted=False
+        # 2. 세션 생성
+        session = Session.objects.create(
+            clerk_user_id=clerk_id,
+            title=generated_title,
+            bookmark=False
         )
+
+        return Response({
+            "status": "success",
+            "code": "COMMON_201",
+            "message": "새로운 채팅 세션이 생성되었습니다.",
+            "data": {"session_id": session.id, "title": session.title}
+        }, status=status.HTTP_201_CREATED)
+# --- 세션 리스트 조회 & 생성 ---
+class SessionListCreateView(APIView):
+    def get(self, request):
+        clerk_id = get_clerk_user_id(request)
+        if not clerk_id:
+            return Response({
+                "status": "error",
+                "code": "ERR_401",
+                "message": "인증 토큰이 필요합니다."
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        sessions = Session.objects.filter(clerk_user_id=clerk_id, is_deleted=False).order_by("-id")
+        data = [{"id": s.id, "title": s.title, "bookmark": s.bookmark} for s in sessions]
+
+        return Response({
+            "status": "success",
+            "code": "COMMON_200",
+            "message": "세션 목록 조회 성공",
+            "data": data
+        }, status=status.HTTP_200_OK)
+
+
+# --- 세션 상세 ---
+class SessionDetailView(APIView):
+    def patch(self, request, session_id):
+        session = get_object_or_404(Session, id=session_id, is_deleted=False)
+        title = request.data.get("title")
+        bookmark = request.data.get("bookmark")
+
+        if title is not None:
+            session.title = title
+        if bookmark is not None:
+            session.bookmark = bookmark
+        session.save()
+
+        return Response({
+            "status": "success",
+            "code": "COMMON_201",
+            "message": "세션 정보가 수정되었습니다.",
+            "data": {"title": session.title, "bookmark": session.bookmark}
+        }, status=status.HTTP_200_OK)
+
+    def delete(self, request, session_id):
+        session = get_object_or_404(Session, id=session_id, is_deleted=False)
+        session.is_deleted = True
+        session.save()
+
+        return Response({
+            "status": "success",
+            "code": "COMMON_200",
+            "message": "세션이 삭제되었습니다.",
+            "data": {"session_id": session.id, "title": session.title}
+        }, status=status.HTTP_200_OK)
+
+
+# --- 채팅 메시지 ---
+class ChatMessageView(APIView):
+    def get(self, request, session_id):
+        session = get_object_or_404(Session, id=session_id, is_deleted=False)
+        messages = Message.objects.filter(session=session, is_deleted=False).order_by("created_at")
+        data = AIChatResponseSerializer(messages, many=True).data
+
+        return Response({
+            "status": "success",
+            "code": "COMMON_200",
+            "message": "메시지 조회 성공",
+            "data": data
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request, session_id):
+        session = get_object_or_404(Session, id=session_id, is_deleted=False)
+        user_sentence = request.data.get("message")
+        if not user_sentence:
+            return Response({"error": "메시지 내용이 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ai_message = ChatService.create_chat_pair(session, user_sentence)
+        return Response({
+            "status": "success",
+            "code": "COMMON_201",
+            "message": "AI 답변 생성 성공",
+            "data": AIChatResponseSerializer(ai_message).data
+        }, status=status.HTTP_201_CREATED)
+
+
+# --- 채팅 수정 ---
+class ChatUpdateView(APIView):
+    def patch(self, request, message_id):
+        new_content = request.data.get("message")
+        if not new_content:
+            return Response({"error": "수정할 메시지 내용이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        original_user_msg = get_object_or_404(Message, id=message_id, role='user', is_deleted=False)
         session = original_user_msg.session
 
-        # 2. 서비스 호출 (삭제 후 새로 생성하는 로직)
         new_ai_msg = ChatService.update_chat_by_replacement(session, original_user_msg, new_content)
 
         return Response({
@@ -105,6 +199,3 @@ def patch(self, request, session_id=None, message_id=None):
             "message": "메시지가 성공적으로 교체되었습니다.",
             "data": AIChatResponseSerializer(new_ai_msg).data
         }, status=status.HTTP_200_OK)
-
-    except Session.DoesNotExist:
-        return Response({"status": "error", "message": "세션을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)

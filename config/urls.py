@@ -30,4 +30,5 @@ urlpatterns = [
     path('webhooks/', include('webhooks.urls')),
     # Chats
     path('api/', include('chats.urls')),
+
 ]

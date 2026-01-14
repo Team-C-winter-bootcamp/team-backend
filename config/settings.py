@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
 )
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+environ.Env.read_env(os.path.join(BASE_DIR, 'backend.env'))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='unsafe-secret-key')
 CLERK_WEBHOOK_SECRET = env('CLERK_WEBHOOK_SECRET', default='unsafe-secret')

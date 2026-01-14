@@ -11,5 +11,5 @@ class AIChatResponseSerializer(serializers.ModelSerializer):
 
 
 
-class CreateSessionSerializer(serializers.ModelSerializer):
-    message = serializers.CharField()
+class CreateSessionSerializer(serializers.Serializer):
+    message = serializers.CharField(required=True, help_text="첫 메시지 내용")
