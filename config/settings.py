@@ -25,9 +25,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     # Local apps
-    'users',
-    'webhooks',
-    'chats',
+    'users.apps.UsersConfig',
+    'webhooks.apps.WebhooksConfig',
+    'chats.apps.ChatsConfig',
+
 ]
 
 MIDDLEWARE = [
