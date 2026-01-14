@@ -8,3 +8,8 @@ class AIChatResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['id', 'order', 'role', 'content']
+
+
+
+class CreateSessionSerializer(serializers.ModelSerializer):
+    message = serializers.CharField()
