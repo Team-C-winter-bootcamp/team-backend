@@ -10,6 +10,7 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='unsafe-secret-key')
+CLERK_WEBHOOK_SECRET = env('CLERK_WEBHOOK_SECRET', default='unsafe-secret')
 DEBUG = env.bool('DEBUG', default=False)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
@@ -20,9 +21,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # 3rd-party apps
     'rest_framework',
-    'chats',
     'drf_yasg',
+    # Local apps
+    'users',
+    'webhooks',
+    'chats',
 ]
 
 MIDDLEWARE = [
