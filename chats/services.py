@@ -1,11 +1,14 @@
+import os
 import requests
 from django.db import transaction
-from .models import Session, Message
+from .models import Message
+
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
 class OllamaService:
     @staticmethod
     def ask_ai(content):
-        url = "http://localhost:11434/api/chat"
+        url = f"{OLLAMA_URL}/api/chat"
         payload = {
             "model": "llama3.2",
             "messages": [{"role": "user", "content": content}],
@@ -19,6 +22,22 @@ class OllamaService:
             return f"Ollama 연결 에러: {str(e)}"
 
 class ChatService:
+    def generate_session_title(first_message):
+        """
+        사용자의 첫 메시지를 바탕으로 Ollama에게 짧은 제목 생성을 요청합니다.
+        """
+        prompt = (
+            f"다음 메시지의 주제를 10자 이내의 한국어 제목으로 요약해줘: '{first_message}'\n"
+            "설명 없이 딱 제목만 말해."
+        )
+
+        generated_title = OllamaService.ask_ai(prompt)
+
+        if "Ollama 연결 에러" in generated_title or generated_title == "답변 생성 실패":
+            return "새로운 채팅"
+
+        return generated_title.strip()
+
     @staticmethod
     @transaction.atomic  # 유저/AI 메시지 저장은 한 번에 성공해야 하므로 원자성 보장
     def create_chat_pair(session, user_content):
