@@ -4,3 +4,4 @@
 backend.env
 .idea*
 *.sqlite3
+*.env
