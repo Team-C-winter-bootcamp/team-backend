@@ -30,5 +30,8 @@ packaging==25.0
 #clerk
 svix==1.38.0
 
+# JWT
+PyJWT==2.9.0
+PyJWT[crypto]==2.9.0
 
 requests==2.32.5
