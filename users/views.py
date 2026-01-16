@@ -327,14 +327,14 @@ class UserMeView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class ClerkWebhookView(APIView):
     """
-    Clerk Webhook 이벤트를 처리하는 뷰
+    이 Clerk Webhook 이벤트를 처리하는 뷰
 
-    user.created, user.updated 이벤트를 처리하여 DB에 반영합니다.
+    user.created, user.updated, user.deleted 이벤트를 처리하여 DB에 반영합니다.
     """
 
     @swagger_auto_schema(
         operation_summary="Clerk Webhook 수신",
-        operation_description="Clerk에서 발생한 webhook 이벤트를 받아서 DB에 반영합니다. user.created, user.updated 이벤트를 처리합니다.\n\n**주의사항:**\n- 실제 Clerk webhook은 Svix 서명 검증이 필요합니다.\n- 테스트용으로는 Swagger의 예시 데이터를 사용할 수 없습니다.\n- 실제 webhook은 Clerk Dashboard에서 설정한 엔드포인트로만 전송됩니다.",
+        operation_description="Clerk에서 발생한 webhook 이벤트를 받아서 DB에 반영합니다. user.created, user.updated, user.deleted 이벤트를 처리합니다.\n\n**주의사항:**\n- 실제 Clerk webhook은 Svix 서명 검증이 필요합니다.\n- 테스트용으로는 Swagger의 예시 데이터를 사용할 수 없습니다.\n- 실제 webhook은 Clerk Dashboard에서 설정한 엔드포인트로만 전송됩니다.",
         tags=["사용자"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
@@ -343,7 +343,7 @@ class ClerkWebhookView(APIView):
                 "type": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="이벤트 타입",
-                    enum=["user.created", "user.updated"],
+                    enum=["user.created", "user.updated", "user.deleted"],
                     example="user.created"
                 ),
                 "data": openapi.Schema(
@@ -493,6 +493,8 @@ class ClerkWebhookView(APIView):
             return self._handle_user_created(data)
         elif event_type == "user.updated":
             return self._handle_user_updated(data)
+        elif event_type == "user.deleted":
+            return self._handle_user_deleted(data)
         else:
             logger.info(f"처리하지 않는 이벤트 타입: {event_type}")
             return Response({
@@ -507,21 +509,30 @@ class ClerkWebhookView(APIView):
             clerk_id = data.get("id")
             email_addresses = data.get("email_addresses", [])
             email = email_addresses[0].get("email_address") if email_addresses else None
-
             first_name = data.get("first_name")
             last_name = data.get("last_name")
 
-            # 사용자 생성 또는 업데이트
-            user, created = User.objects.update_or_create(
-                clerk_id=clerk_id,
-                defaults={
-                    "email": email,
-                    "first_name": first_name,
-                    "last_name": last_name
-                }
-            )
+            # 기존에 삭제된 사용자인지 확인 (이메일 기준)
+            user = User.objects.filter(email=email).first()
 
-            action = "생성" if created else "업데이트"
+            if user:
+                # 삭제된 사용자가 존재하면 정보 업데이트 및 활성화
+                user.clerk_id = clerk_id
+                user.first_name = first_name
+                user.last_name = last_name
+                user.is_deleted = False
+                user.save()
+                action = "재활성"
+            else:
+                # 새로운 사용자 생성
+                user = User.objects.create(
+                    clerk_id=clerk_id,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+                action = "생성"
+
             logger.info(f"사용자 {action}: clerk_id={clerk_id}, email={email}")
 
             return Response({
@@ -549,7 +560,6 @@ class ClerkWebhookView(APIView):
             clerk_id = data.get("id")
             email_addresses = data.get("email_addresses", [])
             email = email_addresses[0].get("email_address") if email_addresses else None
-
             first_name = data.get("first_name")
             last_name = data.get("last_name")
 
@@ -559,7 +569,8 @@ class ClerkWebhookView(APIView):
                 defaults={
                     "email": email,
                     "first_name": first_name,
-                    "last_name": last_name
+                    "last_name": last_name,
+                    "is_deleted": False  # 업데이트 시 항상 활성 상태로 설정
                 }
             )
 
@@ -578,6 +589,42 @@ class ClerkWebhookView(APIView):
 
         except Exception as e:
             logger.error(f"user.updated 이벤트 처리 중 오류: {str(e)}")
+            return Response({
+                "status": "error",
+                "code": "ERR_500",
+                "message": f"이벤트 처리 중 오류가 발생했습니다: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _handle_user_deleted(self, data):
+        """user.deleted 이벤트 처리"""
+        try:
+            clerk_id = data.get("id")
+            
+            # 사용자 삭제 (is_deleted = True)
+            user = User.objects.filter(clerk_id=clerk_id).first()
+            
+            if user:
+                user.is_deleted = True
+                user.save()
+                logger.info(f"사용자 삭제 처리: clerk_id={clerk_id}")
+                return Response({
+                    "status": "success",
+                    "code": "COMMON_200",
+                    "message": "사용자가 삭제 처리되었습니다.",
+                    "data": {
+                        "clerk_id": clerk_id
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                logger.warning(f"삭제하려는 사용자를 찾을 수 없음: clerk_id={clerk_id}")
+                return Response({
+                    "status": "error",
+                    "code": "ERR_404",
+                    "message": "삭제하려는 사용자를 찾을 수 없습니다."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            logger.error(f"user.deleted 이벤트 처리 중 오류: {str(e)}")
             return Response({
                 "status": "error",
                 "code": "ERR_500",
