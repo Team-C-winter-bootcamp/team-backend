@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+AUTH_USER_MODEL = 'users.User'
 
 load_dotenv()
 
@@ -23,6 +24,7 @@ INSTALLED_APPS = [
     "users",
     "webhooks",
     "chats",
+    "precedents"
 ]
 
 MIDDLEWARE = [
