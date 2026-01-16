@@ -43,6 +43,8 @@ class User(AbstractBaseUser):
     """
     clerk_id = models.CharField(max_length=255, unique=True, help_text="Clerk User ID")
     email = models.EmailField(max_length=50, unique=True, null=True, blank=True)
+    first_name = models.CharField(max_length=50, null=True, blank=True, help_text="이름")
+    last_name = models.CharField(max_length=50, null=True, blank=True, help_text="성")
     # password 필드는 Clerk에서 인증을 처리하므로 사용하지 않습니다.
     # AbstractBaseUser의 password 필드는 상속되지만 사용하지 않습니다.
     created_at = models.DateTimeField(auto_now_add=True)
