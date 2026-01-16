@@ -22,7 +22,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_yasg",
     "users",
-    "webhooks",
     "chats",
     "precedents"
 ]
@@ -77,6 +76,7 @@ SWAGGER_SETTINGS = {
             "type": "apiKey",
             "name": "Authorization",
             "in": "header",
+            "description": "Bearer 토큰을 입력하세요. 'Bearer ' 접두사는 자동으로 추가됩니다. 예: test_token_debug 또는 Bearer your_token_here"
         }
     },
     "USE_SESSION_AUTH": False,
