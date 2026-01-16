@@ -10,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: always
 
   backend:
     build:
@@ -17,7 +18,7 @@ services:
       dockerfile: Dockerfile
     container_name: backend
     env_file:
-      - backend.env # 파일명이 .env가 아니라 backend.env인 것 확인!
+      - backend.env
     ports:
       - "8000:8000"
     volumes:
@@ -25,6 +26,7 @@ services:
     restart: always
     depends_on:
       - postgres
+      - opensearch  # OpenSearch가 뜬 후에 백엔드가 뜨도록 추가
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: >
@@ -35,5 +37,45 @@ services:
       python manage.py runserver 0.0.0.0:8000
       "
 
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch-node
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    restart: always
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      # OPENSEARCH_HOSTS는 서비스 이름인 'opensearch'를 바라봐야 합니다.
+      - 'OPENSEARCH_HOSTS=["http://opensearch:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true"
+    depends_on:
+      - opensearch
+    restart: always
+
+# 중복되었던 volumes 섹션을 하나로 통합했습니다.
 volumes:
   postgres_data:
+  opensearch-data:
