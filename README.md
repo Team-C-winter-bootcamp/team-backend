@@ -14,14 +14,53 @@
   - `http://localhost:8000/swagger.json` / `swagger.yaml`
 
 ## Docker 개발 환경
-- `.env` 준비 후 빌드/실행:
-  - `docker compose build`
-  - `docker compose up`
-- 내부에서 실행되는 명령:
-  - `python manage.py migrate`
-  - `python manage.py collectstatic --noinput`
-  - `gunicorn config.wsgi:application --bind 0.0.0.0:8000`
-- 접속: `http://localhost:8000`
+
+### 빠른 시작
+
+1. **환경 변수 파일 확인**
+   - `backend.env` 파일이 존재하는지 확인
+   - `DB_HOST=postgres`로 설정되어 있는지 확인
+
+2. **Docker 실행**
+   ```bash
+   docker compose up --build
+   ```
+
+3. **슈퍼유저 생성** (별도 터미널)
+   ```bash
+   docker compose exec backend python create_superuser.py
+   ```
+
+4. **접속**
+   - API: `http://localhost:8000`
+   - Swagger: `http://localhost:8000/swagger/`
+   - Admin: `http://localhost:8000/admin/`
+
+### 상세 가이드
+
+자세한 Docker 사용 방법은 [DOCKER_GUIDE.md](DOCKER_GUIDE.md)를 참고하세요.
+
+### 주요 명령어
+
+```bash
+# 빌드 및 실행
+docker compose up --build
+
+# 백그라운드 실행
+docker compose up -d
+
+# 중지
+docker compose down
+
+# 로그 확인
+docker compose logs -f backend
+
+# 마이그레이션
+docker compose exec backend python manage.py migrate
+
+# 슈퍼유저 생성
+docker compose exec backend python create_superuser.py
+```
 
 ## 환경 변수
 - `env.example`를 참고하여 `.env` 생성
