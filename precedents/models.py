@@ -84,7 +84,7 @@ class Precedent(BaseModel):
 # --- 관계 테이블 ---
 
 class RelationOutcome(BaseModel):
-    precedent = models.ForeignKey(Precedent, on_delete=models.CASCADE, db_column='precedents_id')
+    precedent = models.OneToOneField(Precedent, on_delete=models.CASCADE, db_column='precedents_id', related_name='relationoutcome')
     outcome = models.ForeignKey(Outcome, on_delete=models.CASCADE, db_column='outcomes_id')
     outcome_value = models.IntegerField(null=True, blank=True)
 
