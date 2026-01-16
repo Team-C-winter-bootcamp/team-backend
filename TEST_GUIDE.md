@@ -17,7 +17,7 @@ python manage.py createsuperuser
 입력 예시:
 - Clerk id: `admin_user`
 - Email: `admin@example.com`
-- Password: (원하는 비밀번호 입력 - Clerk를 사용하므로 실제로는 사용되지 않음)
+- Password: (원하는 비밀번호 입력 - Clerk를 사용하므로 실제로는 사용되지 않음) -admin123-
 
 **참고**: 로컬 개발 환경에서는 SQLite를 사용하도록 설정되어 있습니다. (`backend.env`의 `DB_HOST=sqlite`)
 
