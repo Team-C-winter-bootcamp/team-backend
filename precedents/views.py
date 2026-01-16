@@ -115,10 +115,10 @@ class PrecedentListView(APIView):
         if court_code:
             queryset = queryset.filter(court__court_code=court_code)
         if outcome_display:
-            queryset = queryset.filter(relationoutcome_set__outcome__outcome_type=outcome_display).distinct()
+            queryset = queryset.filter(relationoutcome__outcome__outcome_type=outcome_display)
 
-        # 5. N+1 쿼리 방지를 위한 prefetch
-        queryset = queryset.prefetch_related('relationoutcome_set__outcome')
+        # 5. N+1 쿼리 방지를 위한 select_related (1대1 관계이므로 select_related 사용)
+        queryset = queryset.select_related('relationoutcome__outcome')
 
         # 6. 직렬화 및 응답
         serializer = PrecedentListSerializer(queryset, many=True)
