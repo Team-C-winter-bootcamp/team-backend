@@ -36,7 +36,16 @@ class ChatService:
         if "Ollama 연결 에러" in generated_title or generated_title == "답변 생성 실패":
             return "새로운 채팅"
 
-        return generated_title.strip()
+        # 앞뒤 백슬래시, 따옴표, 공백 제거
+        generated_title = generated_title.strip()
+        # 백슬래시 제거
+        generated_title = generated_title.replace('\\', '')
+        # 따옴표 제거 (단일 및 이중 따옴표)
+        generated_title = generated_title.strip('"').strip("'").strip('"').strip("'")
+        # 최종 공백 제거
+        generated_title = generated_title.strip()
+        
+        return generated_title
 
     @staticmethod
     @transaction.atomic  # 유저/AI 메시지 저장은 한 번에 성공해야 하므로 원자성 보장
