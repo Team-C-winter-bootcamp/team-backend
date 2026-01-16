@@ -25,8 +25,20 @@ class PrecedentAdmin(BaseAdmin):
     list_filter = ('court', 'decision_type', 'judge_date') + BaseAdmin.list_filter
 
     # [수정] 64번 라인 근처의 중복된 search_fields를 하나로 통합했습니다.
-    search_fields = ('case_no', 'case_title', 'case_name', 'judgment_content')
+    search_fields = ('case_no', 'case_title', 'case_name')
     date_hierarchy = 'judge_date'
+    
+    # 긴 텍스트 필드들은 admin에서 제외 (판례내용 등은 S3에 저장되므로)
+    exclude = (
+        'judgment_content',  # 판결내용
+        'judgment_summary',  # 판결요지
+        'holdings',  # 판시사항
+        'question',  # 질문
+        'answer',  # 답변
+        'summary_original',  # 요약원문
+        'summary',  # 요약
+    )
+    
     # 이 판례를 다른 곳에서 검색할 때 사용할 필드 설정
     # (PrecedentAdmin 자체가 search_fields를 가지고 있어야 autocomplete가 작동함)
 

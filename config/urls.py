@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, re_path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
@@ -32,3 +34,9 @@ urlpatterns = [
     path('api/', include('chats.urls')),
     path('api/precedents/', include('precedents.urls')),
 ]
+
+# 개발 환경에서 정적 파일 및 미디어 파일 제공
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    if hasattr(settings, 'MEDIA_URL') and hasattr(settings, 'MEDIA_ROOT'):
+        urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
