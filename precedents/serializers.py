@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Precedent
+from .models import Precedent, RelationOutcome
 
 class PrecedentListSerializer(serializers.ModelSerializer):
     precedents_id = serializers.IntegerField(source='id')
@@ -16,11 +16,13 @@ class PrecedentListSerializer(serializers.ModelSerializer):
         return obj.judgment_content[:100] if obj.judgment_content else ""
 
     def get_outcome_display(self, obj):
-        # RelationOutcome 테이블을 조회하여 실제 결과 반환
-        relation_outcomes = obj.relationoutcome_set.filter(is_deleted=False)
-        if relation_outcomes.exists():
-            # 첫 번째 결과의 outcome_type 반환 (여러 개가 있을 경우 첫 번째 것만)
-            return relation_outcomes.first().outcome.outcome_type
+        # RelationOutcome 테이블을 조회하여 실제 결과 반환 (1대1 관계)
+        try:
+            relation_outcome = obj.relationoutcome
+            if relation_outcome and not relation_outcome.is_deleted:
+                return relation_outcome.outcome.outcome_type
+        except RelationOutcome.DoesNotExist:
+            pass
         return "결과 없음"
 
 class PrecedentDetailSerializer(serializers.ModelSerializer):
@@ -34,7 +36,8 @@ class PrecedentDetailSerializer(serializers.ModelSerializer):
             'case_title', 
             'case_name', 
             'full_text',
-            'judgment_content',            'judgment_summary',
+            'judgment_content',           
+            'judgment_summary',
             'holdings',
             'question',
             'answer',
