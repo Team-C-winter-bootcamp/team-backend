@@ -75,3 +75,4 @@ class User(AbstractBaseUser):
         verbose_name = "사용자"
         verbose_name_plural = "사용자 목록"
         ordering = ["-created_at"]
+        db_table = "users"
