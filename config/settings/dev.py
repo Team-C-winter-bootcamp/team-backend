@@ -8,11 +8,13 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 # 데이터베이스 설정
-# 로컬 개발 환경: DB_HOST가 "postgres" (Docker)가 아니면 SQLite 사용
+# DB_ENGINE 환경 변수로 데이터베이스 타입 결정
+# "postgresql" 또는 "sqlite3" 중 선택 가능
+DB_ENGINE = os.getenv("DB_ENGINE", "postgresql")
 DB_HOST = os.getenv("DB_HOST", "postgres")
 
-if DB_HOST == "postgres":
-    # Docker 환경: PostgreSQL 사용
+if DB_ENGINE == "postgresql" or DB_ENGINE == "django.db.backends.postgresql":
+    # PostgreSQL 사용 (Docker 또는 RDS)
     DATABASES = {
         'default': {
             "ENGINE": "django.db.backends.postgresql",
@@ -21,6 +23,9 @@ if DB_HOST == "postgres":
             "PASSWORD": os.getenv("DB_PASSWORD", "1234"),
             "HOST": DB_HOST,
             "PORT": os.getenv("DB_PORT", "5432"),
+            "OPTIONS": {
+                "connect_timeout": 30,  # RDS 연결을 위해 타임아웃 증가
+            }
         }
     }
 else:
