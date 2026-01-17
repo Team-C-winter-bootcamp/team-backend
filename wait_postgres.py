@@ -1,78 +1,61 @@
-import logging
+"""
+PostgreSQL/RDS 연결 대기 스크립트
+Docker 컨테이너 시작 시 데이터베이스가 준비될 때까지 대기
+"""
 import os
-from pathlib import Path
-from time import time, sleep
-
+import sys
+import time
 import psycopg2
 from psycopg2 import OperationalError
 
-# 환경 변수 파일 로드 (로컬 실행 시 필요)
-env_path = Path(__file__).resolve().parent / "backend.env"
-if env_path.exists():
-    from dotenv import load_dotenv
-    load_dotenv(env_path)
+# 환경변수에서 데이터베이스 설정 읽기
+DB_HOST = os.getenv("DB_HOST", "postgres")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "mydatabase")
+DB_USER = os.getenv("DB_USER", "sa")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
 
+# RDS를 사용하는 경우 DB_HOST가 RDS 엔드포인트일 수 있음
+# DB_ENGINE이 sqlite3이면 스킵
+DB_ENGINE = os.getenv("DB_ENGINE", "postgresql")
 
-def postgres_is_ready():
-    check_timeout = 300  # RDS 연결을 위해 타임아웃 증가 (5분)
-    check_interval = 5
-    start_time = time()
+if DB_ENGINE == "sqlite3":
+    print("[INFO] SQLite 사용 중이므로 PostgreSQL 연결 대기를 건너뜁니다.")
+    sys.exit(0)
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.addHandler(logging.StreamHandler())
+max_retries = 30
+retry_delay = 2
 
-    # 환경 변수에서 DB 설정 가져오기
-    db_host = os.getenv("DB_HOST", "postgres")
-    db_user = os.getenv("DB_USER", "sa")
-    db_password = os.getenv("DB_PASSWORD", "1234")
-    db_name = os.getenv("DB_NAME", "mydatabase")
-    db_port = int(os.getenv("DB_PORT", "5432"))
+print(f"[INFO] PostgreSQL 연결 대기 중...")
+print(f"  Host: {DB_HOST}")
+print(f"  Port: {DB_PORT}")
+print(f"  Database: {DB_NAME}")
+print(f"  User: {DB_USER}")
 
-    logger.info(f"Attempting to connect to PostgreSQL at {db_host}:{db_port}")
-    logger.info(f"Database: {db_name}, User: {db_user}")
+for i in range(max_retries):
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            connect_timeout=5
+        )
+        conn.close()
+        print(f"[SUCCESS] PostgreSQL 연결 성공!")
+        sys.exit(0)
+    except OperationalError as e:
+        if i < max_retries - 1:
+            print(f"[RETRY {i+1}/{max_retries}] 연결 실패, {retry_delay}초 후 재시도... ({str(e)[:50]})")
+            time.sleep(retry_delay)
+        else:
+            print(f"[ERROR] {max_retries}번 시도 후에도 연결 실패")
+            print(f"  오류: {e}")
+            sys.exit(1)
+    except Exception as e:
+        print(f"[ERROR] 예상치 못한 오류: {e}")
+        sys.exit(1)
 
-    while time() - start_time < check_timeout:
-        try:
-            conn = psycopg2.connect(
-                host=db_host,
-                port=db_port,
-                user=db_user,
-                password=db_password,
-                dbname=db_name,
-                connect_timeout=30,  # RDS 연결을 위해 타임아웃 증가
-            )
-            conn.close()
-            logger.info("PostgreSQL Connected Successfully.")
-            return True
-        except OperationalError as e:
-            elapsed = int(time() - start_time)
-            error_msg = str(e)
-            logger.info(f"[{elapsed}s] Waiting for PostgreSQL... ({error_msg})")
-            
-            # 타임아웃 관련 에러인 경우 추가 안내
-            if "timeout" in error_msg.lower():
-                logger.warning("  -> This might indicate:")
-                logger.warning("     1. RDS is not 'Publicly Accessible'")
-                logger.warning("     2. Security group is blocking the connection")
-                logger.warning("     3. RDS is in a Private Subnet")
-            
-            sleep(check_interval)
-        except Exception as e:
-            elapsed = int(time() - start_time)
-            logger.error(f"[{elapsed}s] Unexpected error: {e}")
-            sleep(check_interval)
-
-    logger.error(
-        f"Could not connect to {db_host}:{db_port} within {check_timeout} seconds."
-    )
-    logger.error("Please check:")
-    logger.error("  1. RDS 'Publicly Accessible' setting (must be Yes)")
-    logger.error("  2. Security group allows your IP address")
-    logger.error("  3. RDS is in a Public Subnet")
-    logger.error("  4. RDS instance is in 'Available' status")
-    return False
-
-
-if __name__ == "__main__":
-    postgres_is_ready()
+print(f"[ERROR] 최대 재시도 횟수({max_retries}) 초과")
+sys.exit(1)
