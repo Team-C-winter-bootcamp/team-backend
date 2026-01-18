@@ -67,8 +67,9 @@ def populate_subcategories_by_name():
     print("\nStep 4: Processing JSON files and populating subcategories...")
     inserted_count = 0
     failed_count = 0
-    # unique 한 (부모_ID, 서브카테고리_이름) 조합을 추적하기 위한 Set
-    unique_subcategories = set()
+    # unique 한 (부모_ID, 서브카테고리_이름) 조합을 추적하기 위한 데이터 구조
+    # {parent_id: {instance_name1, instance_name2}, ...}
+    unique_subcategories_by_parent = {}
 
     for file_path in json_files:
         try:
@@ -90,16 +91,18 @@ def populate_subcategories_by_name():
                 failed_count += 1
                 continue
             
-            # 중복 삽입 방지
-            unique_key = (parent_category_id, instance_name)
-            if unique_key in unique_subcategories:
+            # 같은 부모 카테고리 내에서 instance_name이 중복되는지 확인
+            if parent_category_id not in unique_subcategories_by_parent:
+                unique_subcategories_by_parent[parent_category_id] = set()
+            
+            if instance_name in unique_subcategories_by_parent[parent_category_id]:
                 continue
 
             SubCategory.objects.create(
                 category_id=parent_category_id,
                 subcategory_name=instance_name
             )
-            unique_subcategories.add(unique_key)
+            unique_subcategories_by_parent[parent_category_id].add(instance_name)
             inserted_count += 1
 
         except Exception:

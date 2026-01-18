@@ -10,7 +10,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from precedents.models import Precedent, Court, SubCategory
+from precedents.models import Precedent, Court, SubCategory, Category
 
 def format_judge_date(date_str):
     """'YYYY. M. D.' 형식의 날짜 문자열을 'YYYY-MM-DD'로 변환합니다."""
@@ -26,8 +26,14 @@ def populate_data():
     """JSON 파일에서 데이터를 읽어 데이터베이스에 채웁니다."""
     try:
         # 1. ORM을 사용하여 외래 키 정보 로드
+        print("외래 키 정보를 로드합니다...")
         court_map = {court.court_name.strip(): court.id for court in Court.objects.all()}
-        subcategory_map = {sc.subcategory_name.strip(): sc.id for sc in SubCategory.objects.all()}
+        
+        # 카테고리 이름 -> ID 맵
+        category_map = {cat.category_name.strip(): cat.id for cat in Category.objects.all()}
+        
+        # (카테고리 ID, 서브카테고리 이름) -> 서브카테고리 ID 맵
+        subcategory_map = {(sc.category_id, sc.subcategory_name.strip()): sc.id for sc in SubCategory.objects.all()}
         print("외래 키 정보를 성공적으로 로드했습니다.")
         
         # 2. 처리할 JSON 파일 목록 생성
@@ -65,10 +71,17 @@ def populate_data():
                 case_nm = info.get('caseNm')
                 court_type = info.get('courtType')
                 judge_date_str = info.get('judmnAdjuDe')
+                
+                # class_name과 instance_name을 모두 사용
+                class_name = class_info.get('class_name', '').strip()
                 instance_name = class_info.get('instance_name', '').strip()
                 
                 court_id = court_map.get(court_nm)
-                subcategory_id = subcategory_map.get(instance_name)
+                
+                # 카테고리 ID를 먼저 찾고, 복합 키로 서브카테고리 ID를 찾음
+                category_id = category_map.get(class_name)
+                subcategory_id = subcategory_map.get((category_id, instance_name))
+                
                 judge_date = format_judge_date(judge_date_str)
 
                 # 필수 정보 누락 시 건너뛰기
@@ -80,8 +93,8 @@ def populate_data():
                     if not case_title: reason.append('case_title')
                     if not case_nm: reason.append('case_nm')
                     if not judge_date: reason.append('judge_date')
-                    if court_id is None: reason.append(f'court_id (from {court_nm})')
-                    if subcategory_id is None: reason.append(f'subcategory_id (from {instance_name})')
+                    if court_id is None: reason.append(f"court_id (from '{court_nm}')")
+                    if subcategory_id is None: reason.append(f"subcategory_id (from '{class_name}/{instance_name}')")
                     skipped_files_details.append(f"{os.path.basename(file_path)}: 필수 정보 누락 ({', '.join(reason)})")
                     continue
 
