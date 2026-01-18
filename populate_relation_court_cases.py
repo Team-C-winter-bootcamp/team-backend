@@ -100,7 +100,10 @@ def populate_relation_court_cases():
                 skipped_files += 1
                 continue
 
-            precedent_id = precedent_map.get(main_case_no)
+            # main_case_no가 쉼표로 구분되어 있을 경우, 첫 번째 사건번호만 사용
+            main_case_no_cleaned = main_case_no.split(',')[0].strip()
+            
+            precedent_id = precedent_map.get(main_case_no_cleaned)
             if not precedent_id:
                 skipped_files += 1
                 continue
