@@ -46,7 +46,7 @@ class PrecedentAdmin(BaseAdmin):
 # 3. 관계 매핑 테이블 관리 (개별 관리 및 검색 최적화)
 @admin.register(RelationOutcome)
 class RelationOutcomeAdmin(BaseAdmin):
-    list_display = ('precedent', 'outcome', 'outcome_value') + BaseAdmin.list_display
+    list_display = ('precedent', 'outcome') + BaseAdmin.list_display
     autocomplete_fields = ['precedent', 'outcome']
 
 

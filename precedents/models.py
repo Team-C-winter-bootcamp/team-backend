@@ -64,8 +64,8 @@ class Keyword(BaseModel):
 
 class Precedent(BaseModel):
     case_no = models.CharField(max_length=50, verbose_name="사건번호")
-    case_name = models.CharField(max_length=50, verbose_name="사건명")
-    case_title = models.CharField(max_length=100, verbose_name="사건제목")
+    case_name = models.TextField(verbose_name="사건명")
+    case_title = models.TextField(verbose_name="사건제목")
     decision_type = models.CharField(max_length=20, verbose_name="심판유형")
     judge_date = models.DateField(verbose_name="판결선고일")
     court = models.ForeignKey(Court, on_delete=models.CASCADE, db_column='court_id')
@@ -86,7 +86,6 @@ class Precedent(BaseModel):
 class RelationOutcome(BaseModel):
     precedent = models.OneToOneField(Precedent, on_delete=models.CASCADE, db_column='precedents_id', related_name='relationoutcome')
     outcome = models.ForeignKey(Outcome, on_delete=models.CASCADE, db_column='outcomes_id')
-    outcome_value = models.IntegerField(null=True, blank=True)
 
 
 class RelationCourtCase(BaseModel):
