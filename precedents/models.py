@@ -86,7 +86,6 @@ class Precedent(BaseModel):
 class RelationOutcome(BaseModel):
     precedent = models.OneToOneField(Precedent, on_delete=models.CASCADE, db_column='precedents_id', related_name='relationoutcome')
     outcome = models.ForeignKey(Outcome, on_delete=models.CASCADE, db_column='outcomes_id')
-    outcome_value = models.IntegerField(null=True, blank=True)
 
 
 class RelationCourtCase(BaseModel):
