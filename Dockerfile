@@ -8,8 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 시스템 의존성 설치
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+# 4. 필수 시스템 패키지 설치
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 의존성 설치
