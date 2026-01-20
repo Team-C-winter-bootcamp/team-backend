@@ -39,6 +39,17 @@ class PrecedentAdmin(BaseAdmin):
         'summary',  # 요약
     )
     
+    # autocomplete를 위한 queryset 최적화 (데이터베이스에 존재하는 필드만 조회)
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # 데이터베이스에 존재하는 필드만 조회하도록 제한
+        # judgment_content 등이 DB에 없을 수 있으므로 기본 필드만 조회
+        return qs.only(
+            'id', 'case_no', 'case_title', 'case_name', 'decision_type', 
+            'judge_date', 'court_id', 'subcategory_id',
+            'created_at', 'updated_at', 'is_deleted'
+        )
+    
     # 이 판례를 다른 곳에서 검색할 때 사용할 필드 설정
     # (PrecedentAdmin 자체가 search_fields를 가지고 있어야 autocomplete가 작동함)
 
@@ -48,24 +59,76 @@ class PrecedentAdmin(BaseAdmin):
 class RelationOutcomeAdmin(BaseAdmin):
     list_display = ('precedent', 'outcome') + BaseAdmin.list_display
     autocomplete_fields = ['precedent', 'outcome']
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # precedent을 조회할 때 존재하지 않는 필드 제외
+        return qs.select_related('precedent', 'outcome').defer(
+            'precedent__judgment_content',
+            'precedent__judgment_summary',
+            'precedent__holdings',
+            'precedent__question',
+            'precedent__answer',
+            'precedent__summary_original',
+            'precedent__summary',
+        )
 
 
 @admin.register(RelationCourtCase)
 class RelationCourtCaseAdmin(BaseAdmin):
     list_display = ('precedent', 'reference_court_case') + BaseAdmin.list_display
     autocomplete_fields = ['precedent', 'reference_court_case']
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # precedent을 조회할 때 존재하지 않는 필드 제외
+        return qs.select_related('precedent', 'reference_court_case').defer(
+            'precedent__judgment_content',
+            'precedent__judgment_summary',
+            'precedent__holdings',
+            'precedent__question',
+            'precedent__answer',
+            'precedent__summary_original',
+            'precedent__summary',
+        )
 
 
 @admin.register(RelationRule)
 class RelationRuleAdmin(BaseAdmin):
     list_display = ('precedent', 'reference_rule') + BaseAdmin.list_display
     autocomplete_fields = ['precedent', 'reference_rule']
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # precedent을 조회할 때 존재하지 않는 필드 제외
+        return qs.select_related('precedent', 'reference_rule').defer(
+            'precedent__judgment_content',
+            'precedent__judgment_summary',
+            'precedent__holdings',
+            'precedent__question',
+            'precedent__answer',
+            'precedent__summary_original',
+            'precedent__summary',
+        )
 
 
 @admin.register(RelationKeyword)
 class RelationKeywordAdmin(BaseAdmin):
     list_display = ('precedent', 'keyword') + BaseAdmin.list_display
     autocomplete_fields = ['precedent', 'keyword']
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # precedent을 조회할 때 존재하지 않는 필드 제외
+        return qs.select_related('precedent', 'keyword').defer(
+            'precedent__judgment_content',
+            'precedent__judgment_summary',
+            'precedent__holdings',
+            'precedent__question',
+            'precedent__answer',
+            'precedent__summary_original',
+            'precedent__summary',
+        )
 
 
 # 4. 마스터 데이터 관리
