@@ -38,8 +38,6 @@ db.sqlite3-journal
 /media
 /staticfiles
 /static_root
-*.sql
-!**/migrations/**/*.sql
 
 # Environment variables
 .env
@@ -52,7 +50,6 @@ backend.env
 # IDE
 .vscode/
 .idea/
-.cursor/
 *.swp
 *.swo
 *~
@@ -104,8 +101,6 @@ dmypy.json
 *.pid
 *.seed
 *.pid.lock
-.docker/
-docker-compose.override.yml
 
 # Logs
 logs/
