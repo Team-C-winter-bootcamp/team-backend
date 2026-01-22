@@ -28,9 +28,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'storages',  # S3 스토리지 지원
-    'users',
-    'chats',
-    'precedents',
+    'cases',
 ]
 
 MIDDLEWARE = [
@@ -90,7 +88,7 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
-AUTH_USER_MODEL = 'users.User'
+# AUTH_USER_MODEL = 'users.User'
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'

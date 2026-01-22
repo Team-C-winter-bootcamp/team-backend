@@ -1,17 +1,17 @@
 services:
   # RDS를 사용하므로 로컬 PostgreSQL 서비스는 주석 처리
-  # postgres:
-  #   image: postgres:16
-  #   container_name: postgres
-  #   environment:
-  #     POSTGRES_USER: sa
-  #     POSTGRES_PASSWORD: 1234
-  #     POSTGRES_DB: mydatabase
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   restart: always
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: sa
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
 
   backend:
     build:
@@ -26,7 +26,7 @@ services:
       - ./:/app
     restart: always
     depends_on:
-      # - postgres  # RDS 사용 시 주석 처리
+      - postgres  # RDS 사용 시 주석 처리
       - opensearch  # OpenSearch가 뜬 후에 백엔드가 뜨도록 추가
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -78,5 +78,5 @@ services:
 
 # 중복되었던 volumes 섹션을 하나로 통합했습니다.
 volumes:
-  # postgres_data:  # RDS 사용 시 불필요
+  postgres_data:  # RDS 사용 시 불필요
   opensearch-data:
