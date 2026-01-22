@@ -42,3 +42,39 @@ class CaseSearchResponseSerializer(serializers.Serializer):
     code = serializers.IntegerField(help_text="HTTP 상태 코드")
     message = serializers.CharField(help_text="응답 메시지")
     data = CaseSearchDataSerializer(help_text="실제 응답 데이터")
+
+# --- 답변 생성(AI 분석)을 위한 Serializers 추가 ---
+
+class CaseAnswerRequestSerializer(serializers.Serializer):
+    """AI에게 특정 판례에 대한 질문을 던질 때 사용"""
+    case_id = serializers.IntegerField(help_text="분석할 판례의 일련번호")
+    query = serializers.CharField(help_text="사용자의 질문 또는 추가 상황 설명")
+
+class CaseAnswerResponseSerializer(serializers.Serializer):
+    """AI 분석 결과 응답 구조"""
+    status = serializers.CharField()
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = serializers.DictField(help_text="AI 분석 텍스트가 담길 곳")
+
+# --- 판례 상세 조회를 위한 Serializers 추가 ---
+
+class PrecedentDetailDataSerializer(serializers.Serializer):
+    """판례 상세 정보"""
+    case_number = serializers.CharField(help_text="사건번호")
+    case_title = serializers.CharField(help_text="사건명")
+    case_name = serializers.CharField(help_text="사건명 (caseNm)")
+    court = serializers.CharField(help_text="법원명")
+    judgment_date = serializers.DateField(help_text="판결일자")
+    precedent_id = serializers.IntegerField(help_text="판례일련번호")
+    issue = serializers.CharField(help_text="판시사항")
+    holding = serializers.CharField(help_text="판결요지")
+    content = serializers.CharField(help_text="판례내용 (전문)")
+    summary = serializers.CharField(help_text="AI 요약")
+
+class PrecedentDetailResponseSerializer(serializers.Serializer):
+    """판례 상세 조회 응답 구조"""
+    status = serializers.CharField(help_text="응답 상태")
+    code = serializers.IntegerField(help_text="HTTP 상태 코드")
+    message = serializers.CharField(help_text="응답 메시지")
+    data = PrecedentDetailDataSerializer(help_text="판례 상세 정보")
