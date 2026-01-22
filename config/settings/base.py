@@ -27,7 +27,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     'corsheaders',
-    'storages',  # S3 스토리지 지원
     'cases',
 ]
 
