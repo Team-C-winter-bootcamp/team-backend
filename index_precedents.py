@@ -96,13 +96,8 @@ def index_documents():
                 sequence = i + 1
                 chunk_doc_id = f"{original_doc['판례일련번호']}-{sequence}"
 
-                # 임베딩할 텍스트 조합
-                text_to_embed = " ".join([
-                    str(original_doc.get("instance_name", "")),
-                    str(original_doc.get("caseNm", "")),
-                    str(original_doc.get("사건종류명", "")),
-                    chunk_text
-                ]).strip()
+                # 임베딩할 텍스트는 청크 자체입니다.
+                text_to_embed = chunk_text.strip()
 
                 if not text_to_embed:
                     logging.warning(f"임베딩할 내용이 없는 청크: {file_name}, 청크 번호: {sequence}")
