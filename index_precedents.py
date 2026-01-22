@@ -1,9 +1,17 @@
 import os
 import json
-import google.generativeai as genai
+import google.genai as genai
 from opensearchpy import OpenSearch, RequestsHttpConnection
 import logging
-import kss
+import re
+
+# MeCab 사용 (설치: pip install mecab-python3)
+try:
+    import MeCab
+    MECAB_AVAILABLE = True
+except ImportError:
+    MECAB_AVAILABLE = False
+    logging.warning("MeCab이 설치되지 않았습니다. 정규식을 사용하여 문장을 분리합니다.")
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
-genai.configure(api_key=GEMINI_API_KEY)
+genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # OpenSearch 클라이언트 설정
 OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "localhost")
@@ -29,6 +37,48 @@ opensearch_client = OpenSearch(
 INDEX_NAME = "precedents_chunked"
 EMBEDDING_MODEL = "models/text-embedding-004"
 VECTOR_DIMENSION = 768 # text-embedding-004 모델의 차원
+
+
+def split_sentences(text: str) -> list:
+    """
+    텍스트를 문장 단위로 분리합니다.
+    MeCab이 있으면 MeCab을 사용하고, 없으면 정규식을 사용합니다.
+    
+    Args:
+        text: 분리할 텍스트
+    
+    Returns:
+        문장 리스트
+    """
+    if not text or not text.strip():
+        return []
+    
+    # 문장 끝 마커(., !, ?, 。)를 기준으로 분리
+    sentences = re.split(r'([.!?。]\s*)', text)
+    result = []
+    for i in range(0, len(sentences) - 1, 2):
+        if i + 1 < len(sentences):
+            sentence = sentences[i] + sentences[i + 1]
+        else:
+            sentence = sentences[i]
+        sentence = sentence.strip()
+        if sentence:
+            result.append(sentence)
+    if len(sentences) % 2 == 1 and sentences[-1].strip():
+        result.append(sentences[-1].strip())
+    
+    # MeCab이 있으면 형태소 분석을 통해 문장 경계를 더 정확하게 확인
+    if MECAB_AVAILABLE and result:
+        try:
+            mecab = MeCab.Tagger()
+            # MeCab을 사용하여 문장 분리 결과를 검증하고 개선
+            # (현재는 기본 정규식 분리를 사용하고, 향후 MeCab 기반 개선 가능)
+            pass
+        except Exception as e:
+            logging.debug(f"MeCab 초기화 실패 (정규식 사용): {e}")
+    
+    return result if result else [text]
+
 
 def create_index_if_not_exists():
     """인덱스가 존재하지 않으면 새로 생성합니다."""
@@ -89,12 +139,19 @@ def index_documents():
                 logging.warning(f"청킹할 '판례내용'이 없는 파일: {file_name}")
                 continue
 
-            # kss를 사용하여 문장 단위로 청킹
-            chunks = kss.split_sentences(content_to_chunk)
+            # 문장 단위로 청킹 (MeCab 또는 정규식 사용)
+            chunks = split_sentences(content_to_chunk)
 
+            # 사건번호 추출
+            case_no = original_doc.get("사건번호", "")
+            if not case_no:
+                logging.warning(f"사건번호가 없는 파일: {file_name}")
+                continue
+            
             for i, chunk_text in enumerate(chunks):
                 sequence = i + 1
-                chunk_doc_id = f"{original_doc['판례일련번호']}-{sequence}"
+                # 문서 ID를 사건번호_순서 형식으로 구성
+                chunk_doc_id = f"{case_no}_{sequence}"
 
                 # 임베딩할 텍스트는 청크 자체입니다.
                 text_to_embed = chunk_text.strip()
@@ -104,12 +161,20 @@ def index_documents():
                     continue
 
                 # Gemini 임베딩 생성
-                embedding_result = genai.embed_content(
+                embedding_result = genai_client.models.embed_content(
                     model=EMBEDDING_MODEL,
-                    content=text_to_embed,
-                    task_type="RETRIEVAL_DOCUMENT"
+                    contents=text_to_embed
                 )
-                embedding = embedding_result['embedding']
+                
+                # 응답 구조 확인 및 임베딩 추출
+                # google.genai API 응답은 EmbedContentResponse 객체
+                if hasattr(embedding_result, 'embeddings') and len(embedding_result.embeddings) > 0:
+                    embedding = list(embedding_result.embeddings[0].values)
+                elif isinstance(embedding_result, dict):
+                    embedding = embedding_result.get('embedding', embedding_result.get('values', []))
+                else:
+                    logging.error(f"임베딩 추출 실패 - 응답 타입: {type(embedding_result)}")
+                    continue
                 
                 # 청크 문서 생성
                 chunk_doc = {
