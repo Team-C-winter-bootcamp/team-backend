@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'cases',
+    'documents',  # 문서 자동생성
 ]
 
 MIDDLEWARE = [
