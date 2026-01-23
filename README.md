@@ -18,7 +18,7 @@ Django/DRF 기반의 법률 서비스 백엔드 API
 1. `backend.env.example`을 복사하여 `backend.env` 생성:
 
 ```bash
-cp backend.env.example backend.env
+cp backend.env backend.env
 ```
 
 2. `backend.env`에 필요한 환경변수 설정:
