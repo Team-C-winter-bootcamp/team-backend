@@ -104,3 +104,8 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]
+
+# Django REST Framework 설정
+REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'documents.exception_handler.custom_exception_handler',
+}
