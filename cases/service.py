@@ -406,7 +406,7 @@ class OpenSearchService:
                     "court": source.get("court"),  # 법원명
                     "date": source.get("date"),  # 선고일자
                     "score": hit['_score'],  # 유사도 점수 (OpenSearch가 계산)
-                    "preview": source.get("preview")  # 쪼개진 본문 내용 (chunk)
+                    "preview": source.get("preview")
                 }
             if len(unique_precedents) >= k: break  # k개 채우면 즉시 종료
 
