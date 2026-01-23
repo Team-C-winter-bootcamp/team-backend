@@ -255,91 +255,8 @@ class GeminiService:
             logging.error(f"심층 분석 중 오류 발생: {str(e)}", exc_info=True)
             # 기본 구조 반환
             return cls._get_default_analysis_structure()
-    
-    @classmethod
-    def _validate_and_complete_analysis(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """분석 결과를 검증하고 누락된 필드를 기본값으로 채웁니다."""
-        result = cls._get_default_analysis_structure()
-        
-        # outcome_prediction 업데이트
-        if "outcome_prediction" in data:
-            outcome = data["outcome_prediction"]
-            if isinstance(outcome, dict):
-                result["outcome_prediction"].update({
-                    k: v for k, v in outcome.items() 
-                    if k in result["outcome_prediction"]
-                })
-        
-        # action_roadmap 업데이트
-        if "action_roadmap" in data:
-            roadmap = data["action_roadmap"]
-            if isinstance(roadmap, dict):
-                if "steps" in roadmap and isinstance(roadmap["steps"], list):
-                    result["action_roadmap"]["steps"] = roadmap["steps"]
-                if "summary" in roadmap:
-                    result["action_roadmap"]["summary"] = roadmap["summary"]
-        
-        # evidence_strategy 업데이트
-        if "evidence_strategy" in data:
-            evidence = data["evidence_strategy"]
-            if isinstance(evidence, dict):
-                result["evidence_strategy"].update({
-                    k: v for k, v in evidence.items() 
-                    if k in result["evidence_strategy"]
-                })
-        
-        # legal_foundation 업데이트
-        if "legal_foundation" in data:
-            legal = data["legal_foundation"]
-            if isinstance(legal, dict):
-                # applicable_laws와 legal_principles 업데이트
-                if "applicable_laws" in legal:
-                    result["legal_foundation"]["applicable_laws"] = legal["applicable_laws"] if isinstance(legal["applicable_laws"], list) else []
-                if "legal_principles" in legal:
-                    result["legal_foundation"]["legal_principles"] = legal["legal_principles"] if isinstance(legal["legal_principles"], list) else []
-                
-                # relevant_precedents 업데이트 (중첩 구조 처리)
-                if "relevant_precedents" in legal and isinstance(legal["relevant_precedents"], list):
-                    validated_precedents = []
-                    for prec in legal["relevant_precedents"]:
-                        if isinstance(prec, dict):
-                            validated_prec = {
-                                "case_number": prec.get("case_number", ""),
-                                "case_title": prec.get("case_title", ""),
-                                "relevance": prec.get("relevance", ""),
-                                "key_points": prec.get("key_points", []) if isinstance(prec.get("key_points"), list) else []
-                            }
-                            validated_precedents.append(validated_prec)
-                    result["legal_foundation"]["relevant_precedents"] = validated_precedents
-        
-        return result
-    
-    @classmethod
-    def _get_default_analysis_structure(cls) -> Dict[str, Any]:
-        """기본 분석 구조를 반환합니다 (오류 발생 시 사용)"""
-        return {
-            "outcome_prediction": {
-                "win_probability": 0.5,
-                "expected_compensation": "분석 중 오류가 발생했습니다.",
-                "estimated_duration": "분석 중 오류가 발생했습니다.",
-                "risk_factors": [],
-                "confidence_level": "낮음"
-            },
-            "action_roadmap": {
-                "steps": [],
-                "summary": "분석 중 오류가 발생했습니다."
-            },
-            "evidence_strategy": {
-                "required_evidence": [],
-                "recommended_evidence": [],
-                "general_tips": "분석 중 오류가 발생했습니다."
-            },
-            "legal_foundation": {
-                "applicable_laws": [],
-                "legal_principles": [],
-                "relevant_precedents": []
-            }
-        }
+
+
 
 class OpenSearchService:
     """OpenSearch 관련 서비스 클래스"""
@@ -361,17 +278,11 @@ class OpenSearchService:
 
     @classmethod
     def check_connection(cls) -> bool:
-        """OpenSearch 서버와의 연결 상태를 확인합니다."""
-        client = cls.get_client()
+        """OpenSearch 서버 연결 상태를 확인합니다."""
         try:
-            if client.ping():
-                logging.info("OpenSearch 서버에 성공적으로 연결되었습니다.")
-                return True
-            else:
-                logging.error("OpenSearch 서버가 응답하지 않습니다. (Host/Port/Docker 상태 확인 필요)")
-                return False
-        except Exception as e:
-            logging.error(f"OpenSearch 연결 시도 중 예외 발생: {e}")
+            client = cls.get_client()
+            return client.ping()
+        except Exception:
             return False
 
     @classmethod
