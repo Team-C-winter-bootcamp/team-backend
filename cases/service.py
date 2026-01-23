@@ -27,7 +27,9 @@ OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 9200))
 CHUNKED_INDEX_NAME = "precedents_chunked"
 PRECEDENTS_INDEX_NAME = "precedents"
 EMBEDDING_MODEL = "models/text-embedding-004"
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-pro") # 정확도를 위해 Pro 모델 권장
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL")
+if not GEMINI_MODEL:
+    raise ValueError("GEMINI_MODEL 환경 변수가 설정되지 않았습니다.")
 
 # --- JSON 스키마 정의 (구조화된 출력을 위한 참고용) ---
 # Pydantic 모델 대신 JSON 스키마를 프롬프트에 포함하여 구조화된 응답을 유도합니다.
@@ -45,9 +47,12 @@ class GeminiService:
             if not api_key:
                 raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
             
-            # 정확도를 위해 temperature를 낮게 설정(0.2~0.3)
+            # 모델명 정규화: models/ 접두사 제거 및 공백 제거
+            model_name = GEMINI_MODEL.replace("models/", "").strip()
+            
+            # LangChain ChatGoogleGenerativeAI는 모델명만 필요 (models/ 접두사 없음)
             cls._llm = ChatGoogleGenerativeAI(
-                model=GEMINI_MODEL.replace("models/", ""),
+                model=model_name,
                 google_api_key=api_key,
                 temperature=temperature,
                 max_output_tokens=4096, # 구조화된 JSON 응답을 위해 충분한 토큰 확보

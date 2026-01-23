@@ -117,3 +117,8 @@ yarn-error.log*
 frontend/
 Sample/
 data_source/
+
+
+backend.local.env
+docker-compose.local.yml
+.claude/
