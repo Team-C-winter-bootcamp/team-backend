@@ -1,5 +1,5 @@
 services:
-  # RDS를 사용하므로 로컬 PostgreSQL 서비스는 주석 처리
+
   backend:
     build:
       context: .
@@ -13,7 +13,7 @@ services:
       - ./:/app
     restart: always
     depends_on:
-      - opensearch  # OpenSearch가 뜬 후에 백엔드가 뜨도록 추가
+      - opensearch
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: >
@@ -25,7 +25,7 @@ services:
       python index_merged_precedents.py &&
       python manage.py runserver 0.0.0.0:8000
       "
-
+#  python index_merged_precedents.py &&
   opensearch:
     image: opensearchproject/opensearch:latest
     container_name: opensearch-node

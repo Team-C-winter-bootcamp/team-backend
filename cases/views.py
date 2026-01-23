@@ -5,140 +5,85 @@ from drf_yasg.utils import swagger_auto_schema
 from opensearchpy import NotFoundError
 import logging
 
+from drf_yasg import openapi
+from wrapt.importer import when_imported
+
 from .models import Case, Category
-from .serializers import (
-    CaseSearchRequestSerializer,
-    CaseSearchResponseSerializer,
-    CaseAnswerRequestSerializer,
-    CaseAnswerResponseSerializer,
-    PrecedentDetailResponseSerializer,
-    CaseAnalysisResponseSerializer
-)
+from .serializers import *
 from .service import GeminiService, OpenSearchService
 
 
 class CaseSearchView(APIView):
-    """
-    사용자의 상황 설명을 기반으로 유사한 판례를 검색하는 API
-    """
     @swagger_auto_schema(
-        request_body=CaseSearchRequestSerializer,
+        request_body=CaseSerializer,
         responses={
-            status.HTTP_201_CREATED: CaseSearchResponseSerializer,
-            status.HTTP_400_BAD_REQUEST: "잘못된 요청 형식입니다.",
-            status.HTTP_500_INTERNAL_SERVER_ERROR: "서버 내부 오류가 발생했습니다."
+            201: openapi.Response(
+                description="검색 성공",
+                schema=CaseResultSerializer,
+                examples={
+                    "application/json": {
+                        "status": "success",
+                        "code": 201,
+                        "message": "유사 판례 검색이 완료되었습니다.",
+                        "data": {
+                            "case_id": 1,
+                            "total_count": 5,
+                            "results": [
+                                {"title": "2023도1234 판례", "score": 0.95},
+                                {"title": "2022고단567 판례", "score": 0.88}
+                            ]
+                        }
+                    }
+                }
+            ),
+            400: "잘못된 요청 데이터",
+            500: "서버 내부 오류"
         },
-        operation_summary="유사 판례 검색 API",
-        operation_description=(
-            "사용자가 처한 상황(카테고리, 질문에 대한 답변, 상세 설명)을 JSON 형태로 POST하면, "
-            "이를 바탕으로 가장 유사한 판례 4개를 검색하여 반환합니다."
-        ),
+        operation_summary="유사 판례 검색 및 상황 저장",
         tags=["cases"]
     )
-    def post(self, request, *args, **kwargs):
-        serializer = CaseSearchRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        serializer = CaseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        v_data = serializer.validated_data
 
         try:
-            # 1. OpenSearch 연결 확인
-            if not OpenSearchService.check_connection():
-                raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
-
-            # 2. 검색어 생성
-            validated_data = serializer.validated_data
-            category = validated_data["category"]
-            situation = validated_data["situation"]
-            
-            situation_text = ", ".join(situation.values())
-            search_query = f"카테고리: {category}. 상황: {situation_text}"
-
-            # 3. 검색어 임베딩 생성
-            query_embedding = GeminiService.create_embedding(
-                content=search_query
+            category_obj, _ = Category.objects.get_or_create(name=v_data['category'])
+            new_case = Case.objects.create(
+                category=category_obj,
+                who=v_data['who'],
+                when=v_data['when'],
+                what=v_data['what'],
+                want=v_data['want'],
+                detail=v_data['detail']
             )
 
-            # 4. 유사 판례 검색
+            query_embedding = GeminiService.create_embedding(new_case.detail)
+
             precedents = OpenSearchService.search_similar_precedents(
                 query_embedding=query_embedding,
-                k=4,
-                size=50  # 중복 제거를 위해 충분한 수의 결과 가져오기
+                k=5
             )
-            
-            # 5. Case 모델에 데이터 저장
-            # Category 찾기 또는 생성
-            category_obj, created = Category.objects.get_or_create(
-                name=category,
-                defaults={'is_deleted': False}
-            )
-            
-            # user_info에 request 데이터 전체 저장
-            user_info_data = {
-                "category": category,
-                "situation": situation
-            }
-            
-            # Case 인스턴스 생성 및 저장
-            case = Case.objects.create(
-                category=category_obj,
-                user_info=user_info_data,
-                is_deleted=False
-            )
-            
-            # 6. 응답 데이터 구성
-            response_data = {
+            response_payload = {
                 "status": "success",
-                "code": status.HTTP_201_CREATED,
+                "code": 201,
                 "message": "유사 판례 검색이 완료되었습니다.",
                 "data": {
+                    "case_id": new_case.id,
                     "total_count": len(precedents),
                     "results": precedents
                 }
             }
-            
-            # 응답 Serializer를 통해 데이터 유효성 검사
-            response_serializer = CaseSearchResponseSerializer(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
 
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            return Response(response_payload, status=status.HTTP_201_CREATED)
 
-        except ValueError as e:
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_400_BAD_REQUEST,
-                    "message": str(e)
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except ConnectionError as e:
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_503_SERVICE_UNAVAILABLE,
-                    "message": str(e)
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        except NotFoundError as e:
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_404_NOT_FOUND,
-                    "message": str(e)
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
-            logging.error(f"유사 판례 검색 중 오류 발생: {e}", exc_info=True)
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "message": f"검색 중 예기치 않은 오류가 발생했습니다: {str(e)}"
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            logging.error(f"Case Search Error: {str(e)}")
+            return Response({
+                "status": "error",
+                "message": f"처리 중 오류가 발생했습니다: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PrecedentDetailView(APIView):
