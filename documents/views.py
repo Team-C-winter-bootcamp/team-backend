@@ -44,6 +44,7 @@ class DocumentGenerateView(APIView):
             status.HTTP_500_INTERNAL_SERVER_ERROR: "서버 내부 오류가 발생했습니다."
         },
         operation_summary="문서 자동 생성 API",
+        tags=["documents"],
         operation_description="""
         사기 고소장 등 법률 문서를 자동 생성합니다.
 
@@ -150,6 +151,7 @@ class DocumentGenerateFromSituationView(APIView):
             status.HTTP_500_INTERNAL_SERVER_ERROR: "서버 내부 오류가 발생했습니다."
         },
         operation_summary="상황 기반 문서 자동 생성 API",
+        tags=["documents"],
         operation_description="""
         사용자가 자유롭게 작성한 상황 설명을 AI가 분석하여 고소장을 자동 생성합니다.
 
