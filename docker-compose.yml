@@ -1,8 +1,13 @@
 services:
-  # RDS를 사용하므로 로컬 PostgreSQL 서비스는 주석 처리
+  # ============================================================
+  # 로컬 PostgreSQL (개발/테스트용)
+  # RDS 사용 시에는 이 서비스를 제거하거나 별도 profile로 분리 가능
+  # docker compose --profile local up 으로 로컬 DB 사용
+  # ============================================================
   postgres:
     image: postgres:16
     container_name: postgres
+    profiles: ["local"]  # RDS 사용 시 기본 실행에서 제외
     environment:
       POSTGRES_USER: sa
       POSTGRES_PASSWORD: 1234
@@ -13,6 +18,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: always
 
+  # ============================================================
+  # Backend (Django)
+  # 기본적으로 RDS 연결 (backend.env의 DB_HOST 설정에 따름)
+  # ============================================================
   backend:
     build:
       context: .
@@ -26,8 +35,7 @@ services:
       - ./:/app
     restart: always
     depends_on:
-      - postgres  # RDS 사용 시 주석 처리
-      - opensearch  # OpenSearch가 뜬 후에 백엔드가 뜨도록 추가
+      - opensearch  # OpenSearch가 뜬 후에 백엔드가 뜨도록
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: >
@@ -76,7 +84,7 @@ services:
       - opensearch
     restart: always
 
-# 중복되었던 volumes 섹션을 하나로 통합했습니다.
+# Volumes
 volumes:
-  postgres_data:  # RDS 사용 시 불필요
+  postgres_data:  # 로컬 DB 사용 시에만 필요 (profile: local)
   opensearch-data:
