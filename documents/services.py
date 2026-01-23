@@ -1,7 +1,7 @@
 import os
 import re
 import json
-import google.generativeai as genai
+import google.genai as genai
 from typing import Optional
 from datetime import datetime
 
@@ -9,12 +9,12 @@ from .models import Template, Document
 from .validators import validate_document
 
 
-def initialize_gemini():
-    """Gemini API 키를 환경 변수에서 읽어 초기화"""
+def get_gemini_client():
+    """Gemini API 클라이언트를 반환합니다."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
-    genai.configure(api_key=api_key)
+    return genai.Client(api_key=api_key)
 
 
 def get_active_template(doc_type: str) -> Optional[Template]:
@@ -98,7 +98,7 @@ def generate_document_with_gemini(template: Template, values: dict) -> str:
     Returns:
         생성된 Markdown 문서
     """
-    initialize_gemini()
+    client = get_gemini_client()
 
     prompt = build_gemini_prompt(
         template_content=template.content_md,
@@ -106,10 +106,24 @@ def generate_document_with_gemini(template: Template, values: dict) -> str:
         values=values
     )
 
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    response = model.generate_content(prompt)
+    # 환경 변수에서 모델명 가져오기
+    model_name = os.environ.get("GEMINI_MODEL")
+    if not model_name:
+        raise ValueError("GEMINI_MODEL 환경 변수가 설정되지 않았습니다.")
+    model_name = model_name.replace("models/", "").strip()
+    
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt
+    )
 
-    generated_content = response.text.strip()
+    # google.genai API 응답 구조 처리
+    if hasattr(response, 'text'):
+        generated_content = response.text.strip()
+    elif hasattr(response, 'candidates') and len(response.candidates) > 0:
+        generated_content = response.candidates[0].content.parts[0].text.strip()
+    else:
+        raise ValueError(f"예상치 못한 응답 구조: {type(response)}")
 
     # 코드 블록으로 감싸진 경우 제거
     if generated_content.startswith('```markdown'):
@@ -134,7 +148,7 @@ def extract_values_from_situation(situation_text: str, template: Template) -> di
     Returns:
         추출된 변수 값 딕셔너리
     """
-    initialize_gemini()
+    client = get_gemini_client()
 
     variables_desc = {
         "complainant_name": "고소인(피해자) 이름",
@@ -187,13 +201,27 @@ def extract_values_from_situation(situation_text: str, template: Template) -> di
   "attachments": ["항목1"] 또는 null,
   "request_purpose": "추출된 값 또는 null",
   "written_date": "{today}"
-}}
+    }}
 """
 
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    response = model.generate_content(prompt)
+    # 환경 변수에서 모델명 가져오기
+    model_name = os.environ.get("GEMINI_MODEL")
+    if not model_name:
+        raise ValueError("GEMINI_MODEL 환경 변수가 설정되지 않았습니다.")
+    model_name = model_name.replace("models/", "").strip()
+    
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt
+    )
 
-    response_text = response.text.strip()
+    # google.genai API 응답 구조 처리
+    if hasattr(response, 'text'):
+        response_text = response.text.strip()
+    elif hasattr(response, 'candidates') and len(response.candidates) > 0:
+        response_text = response.candidates[0].content.parts[0].text.strip()
+    else:
+        raise ValueError(f"예상치 못한 응답 구조: {type(response)}")
 
     # JSON 코드 블록 제거
     if response_text.startswith('```json'):
