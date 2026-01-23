@@ -113,233 +113,155 @@ class GeminiService:
             logging.error(f"LangChain 요약 중 오류 발생: {str(e)}")
             return f"요약 생성 중 오류가 발생했습니다: {str(e)[:100]}"
     
+
+
     @classmethod
-    def analyze_case_deeply(
-        cls,
-        user_situation: Dict[str, Any],
-        similar_precedents: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def generate_answer_from_precedents(cls, precedent_contents: List[str]) -> Dict[str, Any]:
         """
-        사용자의 상황과 유사 판례를 바탕으로 구조화된 심층 분석을 수행합니다.
-        Pydantic 모델과 LangChain의 구조화된 출력 기능을 사용하여 더 정확하고 일관된 응답을 생성합니다.
-        
-        Args:
-            user_situation: 사용자 상황 정보 (category, situation 등)
-            similar_precedents: 유사 판례 리스트
-        
-        Returns:
-            구조화된 분석 결과 딕셔너리
+        제공된 판례 본문 목록을 바탕으로 구조화된 답변을 생성합니다.
         """
-        llm = cls.get_llm(temperature=0.2)
-        
-        # 사용자 상황 텍스트 구성
-        category = user_situation.get("category", "")
-        situation = user_situation.get("situation", {})
-        situation_text = "\n".join([f"- {key}: {value}" for key, value in situation.items()])
-        
-        # 유사 판례 정보 구성
-        precedents_text = ""
-        for i, prec in enumerate(similar_precedents[:4], 1):  # 최대 4개만 사용
-            precedents_text += f"""
-판례 {i}:
-- 사건번호: {prec.get('case_number', '')}
-- 사건명: {prec.get('case_title', '')}
-- 법원: {prec.get('court', '')}
-- 판결일: {prec.get('judgment_date', '')}
-- 요약: {prec.get('preview', '')}
-"""
-        
-        # 구조화된 프롬프트 템플릿 (JSON 형식 명시)
-        template = """당신은 대한민국 법률 전문가입니다. 사용자의 법률 문제를 분석하여 구조화된 조언을 제공해야 합니다.
+        llm = cls.get_llm(temperature=0.3)
 
-[사용자 상황]
-카테고리: {category}
-상황 설명:
-{situation_text}
+        # 프롬프트에 전달할 판례 본문들을 하나로 합칩니다.
+        full_text = "\n\n---\n\n".join(precedent_contents)
 
-[참고 판례]
-{precedents_text}
+        template = """
+        당신은 대한민국 최고 법률 AI입니다. 제공되는 여러 판례 전문을 종합적으로 분석하여, 사용자의 잠재적 법률 문제에 대한 실행 가능한 솔루션을 구조화된 JSON 형식으로 제공해야 합니다.
 
-[분석 지침]
-1. 결과 예측: 승소 확률은 0~100 사이의 숫자로 제공하고, 실제 판례와 유사한 사례를 참고하여 현실적인 예측을 하세요.
-2. 행동 지침: 내용증명 발송부터 합의까지 단계별로 구체적인 액션 플랜을 제시하세요. 최소 3개 이상의 단계를 포함하세요.
-3. 증거 전략: 필수 증거와 권장 증거를 명확히 구분하고, 각 증거에 대한 수집 팁을 구체적으로 제공하세요.
-4. 법적 근거: 적용되는 법률 조항을 정확히 명시하고, 참고 판례와의 관련성을 상세히 설명하세요.
+        [분석 대상 판례 전문]
+        {full_text}
 
-[출력 형식]
-반드시 다음 JSON 형식으로 정확히 응답하세요. 유효한 JSON만 출력하고, 추가 설명은 포함하지 마세요:
+        [분석 및 답변 생성 지침]
+        1.  **종합 분석**: 개별 판례가 아닌, 모든 판례의 내용을 종합하여 핵심 쟁점과 법리를 관통하는 일관된 분석을 제공하세요.
+        2.  **실행 중심**: 사용자가 실제로 취할 수 있는 구체적인 행동과 전략을 중심으로 답변을 구성하세요.
+        3.  **구조 준수**: 반드시 아래에 명시된 JSON 형식과 키 이름을 정확히 지켜서 응답해야 합니다. 다른 어떤 텍스트도 추가하지 마세요.
 
-{{
-  "outcome_prediction": {{
-    "win_probability": 0-100 사이의 숫자,
-    "expected_compensation": "예상 보상액 (예: '500만원 ~ 1000만원')",
-    "estimated_duration": "예상 소요 기간 (예: '3개월 ~ 6개월')",
-    "risk_factors": ["위험 요소 1", "위험 요소 2"],
-    "confidence_level": "높음 또는 보통 또는 낮음"
-  }},
-  "action_roadmap": {{
-    "steps": [
-      {{
-        "step_number": 1,
-        "title": "단계 제목",
-        "description": "단계 설명",
-        "priority": "필수 또는 권장",
-        "estimated_time": "예상 소요 시간"
-      }}
-    ],
-    "summary": "전체 로드맵 요약"
-  }},
-  "evidence_strategy": {{
-    "required_evidence": [
-      {{
-        "name": "증거명",
-        "type": "REQUIRED",
-        "description": "증거 설명",
-        "collection_tips": "수집 팁"
-      }}
-    ],
-    "recommended_evidence": [
-      {{
-        "name": "증거명",
-        "type": "RECOMMENDED",
-        "description": "증거 설명",
-        "collection_tips": "수집 팁"
-      }}
-    ],
-    "general_tips": "일반적인 증거 수집 가이드"
-  }},
-  "legal_foundation": {{
-    "applicable_laws": ["민법 제570조", "민법 제571조"],
-    "legal_principles": ["법적 원칙 설명 1", "법적 원칙 설명 2"],
-    "relevant_precedents": [    
-      {{
-        "case_number": "사건번호",
-        "case_title": "사건명",
-        "relevance": "관련성 설명",
-        "key_points": ["핵심 포인트 1", "핵심 포인트 2"]
-      }}
-    ]
-  }}
-}}"""
-        
+        [필수 출력 JSON 형식]
+        {{
+          "outcome_prediction": {{
+            "probability": "예상 승소 또는 합의 가능성 (예: '75% 이상')",
+            "expected_result": "가장 가능성 있는 결과에 대한 요약 (예: '임대인의 수리 의무 인정 및 손해배상 책임 발생')",
+            "estimated_compensation": "예상되는 배상 또는 보상 금액 범위 (예: '약 150만원 ~ 250만원')",
+            "estimated_duration": "문제 해결까지 예상되는 소요 기간 (예: '내용증명 발송 후 1~2개월 내 합의 가능')"
+          }},
+          "action_roadmap": [
+            {{
+              "step": 1,
+              "title": "첫 번째 조치의 제목 (예: '손해 사실 공식 통보 및 증거 확보')",
+              "action": "실행할 구체적인 행동 (예: '누수 관련 내용증명 발송')",
+              "description": "해당 조치의 목적과 방법에 대한 상세 설명"
+            }},
+            {{
+              "step": 2,
+              "title": "두 번째 조치의 제목 (예: '객관적인 손해 비용 산정')",
+              "action": "실행할 구체적인 행동 (예: '전문 수리업체로부터 복수 견적서 확보')",
+              "description": "해당 조치의 목적과 방법에 대한 상세 설명"
+            }}
+          ],
+          "evidence_strategy": {{
+            "status": "현재 필요한 증거 확보 상태 (예: '필수 증거 확보 시급')",
+            "checklist": [
+              {{
+                "item": "확보해야 할 증거 항목 (예: '누수 부위 및 피해 상황을 담은 사진/영상')",
+                "status": "증거의 중요도 (예: 'REQUIRED' 또는 'RECOMMENDED')",
+                "tip": "증거 확보 시 유의사항 및 팁 (예: '촬영 날짜와 시간이 나오도록 설정 후 촬영')"
+              }},
+              {{
+                "item": "확보해야 할 증거 항목 (예: '임대인과의 수리 요구 관련 대화 기록')",
+                "status": "증거의 중요도 (예: 'REQUIRED')",
+                "tip": "증거 확보 시 유의사항 및 팁 (예: '문자, 카카오톡 메시지, 통화 녹음 등')"
+              }}
+            ]
+          }},
+          "legal_foundation": {{
+            "logic": "분석의 핵심이 되는 법적 논리 (예: '민법 제623조에 따라, 임대인은 계약 존속 중 임차인이 목적물을 사용·수익하는데 필요한 상태를 유지하게 할 의무를 부담한다.')",
+            "precedent_ref": "분석의 근거가 된 주요 판례 번호 및 핵심 판시사항 요약 (예: '대법원 201X다XXXX 판결: 임대인 수선의무는 특약에 의해 면제할 수 있으나, 대규모 수선은 여전히 임대인이 부담한다.')"
+          }}
+        }}
+        """
+
         prompt = PromptTemplate.from_template(template)
-        
-        # JsonOutputParser 사용 (summarize_precedent_langchain과 동일한 방식)
         json_parser = JsonOutputParser()
-        
-        # 체인 구성: 프롬프트 + LLM + JSON 파서
         chain = prompt | llm | json_parser
-        
+
         try:
-            # 체인 실행
-            response = chain.invoke({
-                "category": category,
-                "situation_text": situation_text,
-                "precedents_text": precedents_text
-            })
-            
-            # 응답이 딕셔너리인지 확인
+            response = chain.invoke({"full_text": full_text})
             if isinstance(response, dict):
-                # 기본 구조 검증 및 보완
-                return cls._validate_and_complete_analysis(response)
+                processed_response = cls._post_process_gemini_answer(response)
+                return processed_response
             else:
-                # 문자열로 반환된 경우 JSON 파싱 시도
                 try:
-                    parsed = json.loads(str(response))
-                    return cls._validate_and_complete_analysis(parsed)
+                    parsed_response = json.loads(str(response))
+                    processed_response = cls._post_process_gemini_answer(parsed_response)
+                    return processed_response
                 except json.JSONDecodeError:
                     logging.error(f"JSON 파싱 실패: {response}")
-                    return cls._get_default_analysis_structure()
-                
+                    return {
+                        "error": "AI 답변을 생성하는 중 오류가 발생했습니다.",
+                        "details": "Gemini 응답을 JSON으로 파싱할 수 없습니다."
+                    }
         except Exception as e:
-            logging.error(f"심층 분석 중 오류 발생: {str(e)}", exc_info=True)
-            # 기본 구조 반환
-            return cls._get_default_analysis_structure()
+            logging.error(f"종합 답변 생성 중 오류 발생: {str(e)}", exc_info=True)
+            # 실패 시 기본 구조 또는 오류 메시지를 담은 구조 반환
+            return {
+                "error": "AI 답변을 생성하는 중 오류가 발생했습니다.",
+                "details": str(e)
+            }
     
     @classmethod
-    def _validate_and_complete_analysis(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """분석 결과를 검증하고 누락된 필드를 기본값으로 채웁니다."""
-        result = cls._get_default_analysis_structure()
-        
-        # outcome_prediction 업데이트
-        if "outcome_prediction" in data:
-            outcome = data["outcome_prediction"]
-            if isinstance(outcome, dict):
-                result["outcome_prediction"].update({
-                    k: v for k, v in outcome.items() 
-                    if k in result["outcome_prediction"]
-                })
-        
-        # action_roadmap 업데이트
-        if "action_roadmap" in data:
-            roadmap = data["action_roadmap"]
-            if isinstance(roadmap, dict):
-                if "steps" in roadmap and isinstance(roadmap["steps"], list):
-                    result["action_roadmap"]["steps"] = roadmap["steps"]
-                if "summary" in roadmap:
-                    result["action_roadmap"]["summary"] = roadmap["summary"]
-        
-        # evidence_strategy 업데이트
-        if "evidence_strategy" in data:
-            evidence = data["evidence_strategy"]
-            if isinstance(evidence, dict):
-                result["evidence_strategy"].update({
-                    k: v for k, v in evidence.items() 
-                    if k in result["evidence_strategy"]
-                })
-        
-        # legal_foundation 업데이트
-        if "legal_foundation" in data:
-            legal = data["legal_foundation"]
-            if isinstance(legal, dict):
-                # applicable_laws와 legal_principles 업데이트
-                if "applicable_laws" in legal:
-                    result["legal_foundation"]["applicable_laws"] = legal["applicable_laws"] if isinstance(legal["applicable_laws"], list) else []
-                if "legal_principles" in legal:
-                    result["legal_foundation"]["legal_principles"] = legal["legal_principles"] if isinstance(legal["legal_principles"], list) else []
-                
-                # relevant_precedents 업데이트 (중첩 구조 처리)
-                if "relevant_precedents" in legal and isinstance(legal["relevant_precedents"], list):
-                    validated_precedents = []
-                    for prec in legal["relevant_precedents"]:
-                        if isinstance(prec, dict):
-                            validated_prec = {
-                                "case_number": prec.get("case_number", ""),
-                                "case_title": prec.get("case_title", ""),
-                                "relevance": prec.get("relevance", ""),
-                                "key_points": prec.get("key_points", []) if isinstance(prec.get("key_points"), list) else []
-                            }
-                            validated_precedents.append(validated_prec)
-                    result["legal_foundation"]["relevant_precedents"] = validated_precedents
-        
-        return result
-    
-    @classmethod
-    def _get_default_analysis_structure(cls) -> Dict[str, Any]:
-        """기본 분석 구조를 반환합니다 (오류 발생 시 사용)"""
-        return {
+    def _post_process_gemini_answer(cls, raw_answer: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Gemini AI의 응답을 후처리하여 정의된 스키마에 맞도록 보완합니다.
+        누락되거나 형식에 맞지 않는 필드에 기본값을 제공하거나 필터링합니다.
+        """
+        processed_answer = {
             "outcome_prediction": {
-                "win_probability": 0.5,
-                "expected_compensation": "분석 중 오류가 발생했습니다.",
-                "estimated_duration": "분석 중 오류가 발생했습니다.",
-                "risk_factors": [],
-                "confidence_level": "낮음"
+                "probability": raw_answer.get("outcome_prediction", {}).get("probability", "정보 없음"),
+                "expected_result": raw_answer.get("outcome_prediction", {}).get("expected_result", "정보 없음"),
+                "estimated_compensation": raw_answer.get("outcome_prediction", {}).get("estimated_compensation", "정보 없음"),
+                "estimated_duration": raw_answer.get("outcome_prediction", {}).get("estimated_duration", "정보 없음"),
             },
-            "action_roadmap": {
-                "steps": [],
-                "summary": "분석 중 오류가 발생했습니다."
-            },
+            "action_roadmap": [],  # 여기에 채워질 예정
             "evidence_strategy": {
-                "required_evidence": [],
-                "recommended_evidence": [],
-                "general_tips": "분석 중 오류가 발생했습니다."
+                "status": raw_answer.get("evidence_strategy", {}).get("status", "정보 없음"),
+                "checklist": []  # 여기에 채워질 예정
             },
             "legal_foundation": {
-                "applicable_laws": [],
-                "legal_principles": [],
-                "relevant_precedents": []
+                "logic": raw_answer.get("legal_foundation", {}).get("logic", "정보 없음"),
+                "precedent_ref": raw_answer.get("legal_foundation", {}).get("precedent_ref", "정보 없음"),
             }
         }
+
+        # Process action_roadmap
+        if "action_roadmap" in raw_answer and isinstance(raw_answer["action_roadmap"], list):
+            for step_data in raw_answer["action_roadmap"]:
+                # 필수 필드가 모두 있는지 확인
+                if all(k in step_data for k in ["step", "title", "action", "description"]):
+                    processed_answer["action_roadmap"].append({
+                        "step": step_data.get("step", 0),
+                        "title": step_data.get("title", "정보 없음"),
+                        "action": step_data.get("action", "정보 없음"),
+                        "description": step_data.get("description", "정보 없음"),
+                    })
+
+        # Process evidence_strategy.checklist
+        if "evidence_strategy" in raw_answer and "checklist" in raw_answer["evidence_strategy"] \
+           and isinstance(raw_answer["evidence_strategy"]["checklist"], list):
+            for item_data in raw_answer["evidence_strategy"]["checklist"]:
+                # 필수 필드가 모두 있는지 확인
+                if all(k in item_data for k in ["item", "status", "tip"]):
+                    processed_answer["evidence_strategy"]["checklist"].append({
+                        "item": item_data.get("item", "정보 없음"),
+                        "status": item_data.get("status", "정보 없음"),
+                        "tip": item_data.get("tip", "정보 없음"),
+                    })
+
+        return processed_answer
+
+
+
+
+
 
 class OpenSearchService:
     """OpenSearch 관련 서비스 클래스"""
@@ -357,6 +279,7 @@ class OpenSearchService:
                 verify_certs=False,
                 ssl_show_warn=False,
             )
+            logging.info(f"OpenSearch client initialized with host: {OPENSEARCH_HOST} (type: {type(OPENSEARCH_HOST)}), port: {OPENSEARCH_PORT} (type: {type(OPENSEARCH_PORT)})")
         return cls._client
 
     @classmethod
@@ -372,6 +295,10 @@ class OpenSearchService:
                 return False
         except Exception as e:
             logging.error(f"OpenSearch 연결 시도 중 예외 발생: {e}")
+            client = cls.get_client()
+            return client.ping()
+        except Exception as e:
+            logging.error(f"OpenSearch 연결 확인 중 오류 발생: {e}", exc_info=True)
             return False
 
     @classmethod
@@ -388,6 +315,73 @@ class OpenSearchService:
 
         response = client.search(index="precedents_chunked", body=knn_query)
         unique_precedents = {}
+        
+        while len(unique_precedents) < k and attempt < max_attempts:
+            # 이전 시도에서 이미 가져온 결과가 있으면 더 많은 결과를 가져옴
+            if attempt > 0:
+                actual_size = actual_size * 2  # 이전보다 2배 더 가져오기
+            
+            knn_query = {
+                "size": actual_size,
+                "_source": {
+                    "excludes": ["content_embedding"]  # 임베딩 벡터는 제외
+                },
+                "query": {
+                    "knn": {
+                        "content_embedding": {
+                            "vector": query_embedding,
+                            "k": actual_size  # k-NN 검색에서도 충분한 수를 가져옴
+                        }
+                    }
+                }
+            }
+            
+            try:
+                response = client.search(
+                    index=CHUNKED_INDEX_NAME,
+                    body=knn_query
+                )
+            except NotFoundError:
+                raise NotFoundError(f"인덱스 '{{CHUNKED_INDEX_NAME}}'를 찾을 수 없습니다. 먼저 데이터 색인을 진행해주세요.")
+            
+            # 결과 처리 (중복 판례 제거 및 점수가 가장 높은 청크 선택)
+            for hit in response['hits']['hits']:
+                score = hit['_score']
+                source = hit['_source']
+                precedent_id = source.get('판례일련번호')
+                
+                if not precedent_id:
+                    continue
+                
+                # 이미 있는 판례면 점수가 더 높을 때만 업데이트
+                if precedent_id not in unique_precedents or score > unique_precedents[precedent_id]['similarity_score']:
+                    unique_precedents[precedent_id] = {
+                        "id": precedent_id,
+                        "case_number": source.get("caseNo", ""),
+                        "case_title": source.get("caseTitle", ""),
+                        "law_category": source.get("사건종류명", ""),
+                        "law_subcategory": source.get("instance_name", ""),
+                        "court": source.get("courtNm", ""),
+                        "judgment_date": source.get("judmnAdjuDe", ""),
+                        "similarity_score": score,
+                        "preview": source.get("summ_contxt", ""),
+                    }
+            
+            # 충분한 판례를 찾았으면 종료
+            if len(unique_precedents) >= k:
+                break
+            
+            attempt += 1
+        
+        # 유사도 점수 기준으로 내림차순 정렬
+        sorted_results = sorted(
+            unique_precedents.values(),
+            key=lambda x: x['similarity_score'],
+            reverse=True
+        )
+        
+        # 최종 k개 선택 (가능한 만큼)
+        return sorted_results[:k]
 
         # 2. 결과 처리: 사전에 넣으면서 자동 중복 제거 (먼저 나온 높은 점수가 유지되도록)
         for hit in response['hits']['hits']:
@@ -411,7 +405,7 @@ class OpenSearchService:
             if len(unique_precedents) >= k: break  # k개 채우면 즉시 종료
 
         return list(unique_precedents.values())
-    
+
     
     @classmethod
     def get_precedent_by_case_number(cls, case_no: str) -> Optional[Dict[str, Any]]:
@@ -438,4 +432,39 @@ class OpenSearchService:
         except NotFoundError:
             return None
         except Exception as e:
-            raise ValueError(f"판례 조회 중 오류 발생: {str(e)}")
+            raise ValueError(f"판례 조회 중 오류 발생: {{str(e)}}")
+
+    @classmethod
+    def get_precedents_by_case_numbers(cls, case_nos: List[str]) -> List[Dict[str, Any]]:
+        """
+        여러 사건번호로 전체 판례 전문을 한 번에 조회합니다.
+
+        Args:
+            case_nos: 사건번호 리스트
+
+        Returns:
+            판례 문서 딕셔너리 리스트
+        """
+        client = cls.get_client()
+
+        if not client.ping():
+            raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
+
+        if not case_nos:
+            return []
+
+        try:
+            response = client.mget(
+                index=PRECEDENTS_INDEX_NAME,
+                body={'ids': case_nos}
+            )
+
+            # 결과에서 _source만 추출하고, found가 true인 것만 필터링
+            return [doc['_source'] for doc in response['docs'] if doc['found']]
+
+        except NotFoundError:
+             # mget은 인덱스가 없으면 404를 반환하지 않을 수 있으므로, ping으로 미리 확인.
+             # 이 코드는 실행되지 않을 수 있으나 안전장치로 둠.
+            return []
+        except Exception as e:
+            raise ValueError(f"여러 판례 조회 중 오류 발생: {{str(e)}}")
