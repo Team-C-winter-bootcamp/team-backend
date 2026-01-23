@@ -122,3 +122,4 @@ data_source/
 backend.local.env
 docker-compose.local.yml
 .claude/
+data/aihub/
