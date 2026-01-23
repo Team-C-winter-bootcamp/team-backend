@@ -51,3 +51,4 @@ mecab-python3
 langchain
 langchain-google-genai
 langchain-core
+google
