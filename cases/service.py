@@ -25,13 +25,10 @@ if not GEMINI_MODEL:
 
 
 class GeminiService:
-    """LangChain을 적용한 Gemini API 서비스 클래스"""
-    
     _llm: Optional[ChatGoogleGenerativeAI] = None
 
     @classmethod
     def get_llm(cls, temperature: float = 0.2) -> ChatGoogleGenerativeAI:
-        """LangChain용 Gemini LLM 인스턴스를 반환합니다."""
         if cls._llm is None:
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
@@ -227,13 +224,13 @@ class OpenSearchService:
                 source = hit['_source']  # OpenSearch에서 가져온 원본 데이터
                 unique_precedents[p_id] = {
                     "id": source.get("id"),  # 사건번호 (caseNo)
-                    "caseNm": source.get("caseNm"),  # 사건명
-                    "title": source.get("title"),  # 판례 제목
-                    "category": source.get("category"),  # 대분류 (민사/형사 등)
-                    "subcategory": source.get("subcategory"),  # 소분류 (배임/해임 등)
+                    "case_number": source.get("caseNm"),  # 사건명
+                    "case_title": source.get("title"),  # 판례 제목
+                    "law_category": source.get("category"),  # 대분류 (민사/형사 등)
+                    "law_subcategory": source.get("subcategory"),  # 소분류 (배임/해임 등)
                     "court": source.get("court"),  # 법원명
-                    "date": source.get("date"),  # 선고일자
-                    "score": hit['_score'],  # 유사도 점수 (OpenSearch가 계산)
+                    "judgment_date": source.get("date"),  # 선고일자
+                    "similarity": hit['_score'],  # 유사도 점수 (OpenSearch가 계산)
                     "preview": source.get("preview")
                 }
             if len(unique_precedents) >= k: break  # k개 채우면 즉시 종료
