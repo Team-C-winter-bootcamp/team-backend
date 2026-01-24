@@ -1,4 +1,22 @@
+# from django.urls import path
+# from .views import CaseSearchView, PrecedentDetailView, CaseAnswerView
+# from documents.views import (
+#     CaseDocumentCreateView,
+#     CaseDocumentDetailView,
+#     DocumentSessionCreateView,
+#     DocumentSessionDetailView,
+#     DocumentSessionMessageView,
+#     DocumentSessionStreamView,
+# )
+#
+# urlpatterns = [
+#     path('', CaseSearchView.as_view(), name='case_search'),
+#     path('<str:precedents_id>/answer/', CaseAnswerView.as_view(), name='case_answer'),
+#     path('<str:precedents_id>/', PrecedentDetailView.as_view(), name='precedent_detail'),
+# ]
+
 from django.urls import path
+<<<<<<< HEAD
 from .views import CaseSearchView, PrecedentDetailView, CaseAnalysisView
 from documents.views import (
     CaseDocumentCreateView,
@@ -23,4 +41,12 @@ urlpatterns = [
     # 판례 조회 API
     path('<int:cases_id>/<str:precedents_id>/', PrecedentDetailView.as_view(), name='precedent_detail'),
     path('<int:case_id>/<str:precedents_id>/answer/', CaseAnalysisView.as_view(), name='case_analysis'),
+=======
+from .views import CaseSearchView, PrecedentDetailView, CaseAnswerView
+
+urlpatterns = [
+    path('', CaseSearchView.as_view(), name='case_search'),
+    path('<str:precedents_id>/answer/', CaseAnswerView.as_view(), name='case_answer'),
+    path('<str:precedents_id>/', PrecedentDetailView.as_view(), name='precedent_detail'),
+>>>>>>> origin/main
 ]
