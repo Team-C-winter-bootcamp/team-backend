@@ -1,28 +1,84 @@
+# -*- coding: utf-8 -*-
 from django.core.management.base import BaseCommand
 from documents.models import Template
 
 
-# 사기 고소장 템플릿 정의
-FRAUD_COMPLAINT_TEMPLATE = {
-    "doc_type": "criminal_complaint_fraud",
-    "name": "사기 고소장 v1",
-    "version": 1,
-    "variables": [
-        "complainant_name",
-        "complainant_contact",
-        "suspect_name",
-        "suspect_contact",
-        "request_purpose",
-        "incident_datetime",
-        "incident_place",
-        "crime_facts",
-        "damage_amount",
-        "complaint_reason",
-        "evidence_list",
-        "attachments",
-        "written_date"
-    ],
-    "content_md": """# 고소장(사기)
+# =============================================================================
+# 템플릿 정의
+# =============================================================================
+
+TEMPLATES = [
+    # -------------------------------------------------------------------------
+    # 1. 내용증명서 (proof_of_contents)
+    # -------------------------------------------------------------------------
+    {
+        "doc_type": "proof_of_contents",
+        "name": "내용증명서 v1",
+        "version": 1,
+        "variables": [
+            "sender_name",
+            "sender_address",
+            "sender_contact",
+            "receiver_name",
+            "receiver_address",
+            "transaction_date",
+            "transaction_details",
+            "claim_amount",
+            "payment_deadline",
+            "bank_account",
+            "written_date",
+        ],
+        "content_md": """# 내용증명서
+
+## 1. 발신인 정보
+- 성명: {{sender_name}}
+- 주소: {{sender_address}}
+- 연락처: {{sender_contact}}
+
+## 2. 수신인 정보
+- 성명: {{receiver_name}}
+- 주소: {{receiver_address}}
+
+## 3. 거래 내역
+- 거래일자: {{transaction_date}}
+- 거래내용: {{transaction_details}}
+- 청구금액: {{claim_amount}}
+
+## 4. 요청 사항
+위 거래와 관련하여 청구금액 {{claim_amount}}을 아래 계좌로 {{payment_deadline}}까지 지급하여 주시기 바랍니다.
+
+만약 위 기한까지 이행하지 않을 경우, 민사상 법적 조치를 취할 것임을 알려드립니다.
+
+## 5. 입금 계좌
+{{bank_account}}
+
+작성일: {{written_date}}
+발신인: {{sender_name}} (인)""",
+    },
+
+    # -------------------------------------------------------------------------
+    # 2. 고소장 (criminal_complaint_fraud)
+    # -------------------------------------------------------------------------
+    {
+        "doc_type": "criminal_complaint_fraud",
+        "name": "고소장 v1",
+        "version": 1,
+        "variables": [
+            "complainant_name",
+            "complainant_contact",
+            "suspect_name",
+            "suspect_contact",
+            "request_purpose",
+            "incident_datetime",
+            "incident_place",
+            "crime_facts",
+            "damage_amount",
+            "complaint_reason",
+            "evidence_list",
+            "attachments",
+            "written_date",
+        ],
+        "content_md": """# 고소장
 
 ## 1. 고소인 인적사항
 - 성명: {{complainant_name}}
@@ -51,41 +107,109 @@ FRAUD_COMPLAINT_TEMPLATE = {
 {{attachments}}
 
 작성일: {{written_date}}
-고소인: {{complainant_name}} (서명)"""
-}
+고소인: {{complainant_name}} (서명)""",
+    },
+
+    # -------------------------------------------------------------------------
+    # 3. 합의서 (settlement_agreement)
+    # -------------------------------------------------------------------------
+    {
+        "doc_type": "settlement_agreement",
+        "name": "합의서 v1",
+        "version": 1,
+        "variables": [
+            "party_a_name",
+            "party_a_contact",
+            "party_a_address",
+            "party_b_name",
+            "party_b_contact",
+            "party_b_address",
+            "incident_summary",
+            "settlement_amount",
+            "payment_method",
+            "payment_deadline",
+            "additional_terms",
+            "written_date",
+        ],
+        "content_md": """# 합의서
+
+## 1. 당사자
+
+### 갑 (피해자)
+- 성명: {{party_a_name}}
+- 연락처: {{party_a_contact}}
+- 주소: {{party_a_address}}
+
+### 을 (가해자)
+- 성명: {{party_b_name}}
+- 연락처: {{party_b_contact}}
+- 주소: {{party_b_address}}
+
+## 2. 사건 개요
+{{incident_summary}}
+
+## 3. 합의 내용
+1. 을은 갑에게 합의금 {{settlement_amount}}을 지급한다.
+2. 지급 방법: {{payment_method}}
+3. 지급 기한: {{payment_deadline}}
+
+## 4. 추가 합의 조건
+{{additional_terms}}
+
+## 5. 효력
+본 합의서 작성 후 갑은 을에 대한 민형사상 일체의 이의를 제기하지 않으며,
+본 합의서는 작성일로부터 법적 효력을 발생한다.
+
+작성일: {{written_date}}
+
+갑: {{party_a_name}} (인)
+을: {{party_b_name}} (인)""",
+    },
+]
 
 
 class Command(BaseCommand):
-    help = '사기 고소장 템플릿을 DB에 시드합니다. (idempotent)'
+    help = "문서 템플릿을 DB에 시드합니다. (idempotent - 중복 실행 안전)"
 
     def handle(self, *args, **options):
-        self.stdout.write("템플릿 시드 시작...")
+        self.stdout.write(self.style.MIGRATE_HEADING("템플릿 시드 시작..."))
+        self.stdout.write("")
 
-        template_data = FRAUD_COMPLAINT_TEMPLATE
+        created_count = 0
+        updated_count = 0
 
-        # doc_type과 version으로 기존 템플릿 조회
-        template, created = Template.objects.update_or_create(
-            doc_type=template_data["doc_type"],
-            version=template_data["version"],
-            defaults={
-                "name": template_data["name"],
-                "content_md": template_data["content_md"],
-                "variables": template_data["variables"],
-                "is_active": True,
-            }
+        for template_data in TEMPLATES:
+            template, created = Template.objects.update_or_create(
+                doc_type=template_data["doc_type"],
+                version=template_data["version"],
+                defaults={
+                    "name": template_data["name"],
+                    "content_md": template_data["content_md"],
+                    "variables": template_data["variables"],
+                    "is_active": True,
+                },
+            )
+
+            if created:
+                created_count += 1
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  [생성] {template.name} "
+                        f"(doc_type={template.doc_type}, version={template.version})"
+                    )
+                )
+            else:
+                updated_count += 1
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  [업데이트] {template.name} "
+                        f"(doc_type={template.doc_type}, version={template.version})"
+                    )
+                )
+
+        self.stdout.write("")
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"템플릿 시드 완료! (생성: {created_count}개, 업데이트: {updated_count}개)"
+            )
         )
-
-        if created:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f'✓ 템플릿 생성됨: {template.name} (doc_type={template.doc_type}, version={template.version})'
-                )
-            )
-        else:
-            self.stdout.write(
-                self.style.WARNING(
-                    f'✓ 템플릿 업데이트됨: {template.name} (doc_type={template.doc_type}, version={template.version})'
-                )
-            )
-
-        self.stdout.write(self.style.SUCCESS("템플릿 시드 완료!"))
