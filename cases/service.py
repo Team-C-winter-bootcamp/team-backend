@@ -111,13 +111,9 @@ class GeminiService:
 
     @classmethod
     def analyze_case_deeply(cls, user_situation: Dict[str, Any], content_text: str) -> Dict[str, Any]:
-        """
-        제공된 판례 전문과 사용자 상황을 대조하여 심층 분석을 수행합니다.
-        """
-        # 반드시 Chat 모델을 반환하는 get_llm()을 사용해야 합니다.
+
         llm = cls.get_llm(temperature=0.2)
 
-        # 사용자 상황 텍스트 구성
         situation_text = f"""
             - 누구와: {user_situation.get('who', '')}
             - 언제: {user_situation.get('when', '')}
