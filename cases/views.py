@@ -19,7 +19,7 @@ class CaseSearchView(APIView):
         responses={
             201: openapi.Response(
                 description="검색 성공",
-                schema=CaseResultSerializer,
+                schema=CaseAnswerApiResponseSerializer,
                 examples={
                     "application/json": {
                         "status": "success",
@@ -87,13 +87,9 @@ class CaseSearchView(APIView):
 
 
 class PrecedentDetailView(APIView):
-    """
-    특정 판례의 전문과 AI 요약을 조회하는 API
-    GET /api/cases/{cases_id}/{precedents_id}
-    """
     @swagger_auto_schema(
         responses={
-            status.HTTP_200_OK: PrecedentDetailResponseSerializer,
+            status.HTTP_200_OK:CaseAnswerApiResponseSerializer,
             status.HTTP_404_NOT_FOUND: "판례를 찾을 수 없습니다.",
             status.HTTP_500_INTERNAL_SERVER_ERROR: "서버 내부 오류가 발생했습니다."
         },
@@ -104,189 +100,95 @@ class PrecedentDetailView(APIView):
         ),
         tags=["cases"]
     )
-    def get(self, request, cases_id, precedents_id, *args, **kwargs):
-        """
-        판례 전문과 AI 요약을 조회합니다.
-        
-        Args:
-            cases_id: Case 모델의 ID (현재는 사용하지 않지만 URL 구조상 필요)
-            precedents_id: 사건번호 (caseNo)
-        """
-        try:
-            # 1. OpenSearch 연결 확인
-            if not OpenSearchService.check_connection():
-                raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
-            
-            # 2. precedents_id는 사건번호(caseNo)
-            case_no = precedents_id
-            
-            # 3. 판례 전문 조회
-            precedent = OpenSearchService.get_precedent_by_case_number(case_no)
-            
-            if not precedent:
-                return Response(
-                    {
-                        "status": "error",
-                        "code": status.HTTP_404_NOT_FOUND,
-                        "message": f"사건번호 '{case_no}'에 해당하는 판례를 찾을 수 없습니다."
-                    },
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # 4. 판례 내용 추출
-            precedent_content = precedent.get("판례내용", "")
-            
-            if not precedent_content:
-                return Response(
-                    {
-                        "status": "error",
-                        "code": status.HTTP_404_NOT_FOUND,
-                        "message": "판례 내용이 없습니다."
-                    },
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # 5. AI 요약 생성 (LangChain 사용)
-            try:
-                ai_summary = GeminiService.summarize_precedent_langchain(precedent_content)
-            except Exception as e:
-                logging.error(f"AI 요약 생성 실패: {type(e).__name__}: {str(e)}", exc_info=True)
-                # 실제 오류 메시지를 포함하여 디버깅 용이하게
-                ai_summary = f"요약 생성 중 오류가 발생했습니다: {str(e)[:200]}"
-            
-            # 6. 응답 데이터 구성
-            response_data = {
-                "status": "success",
-                "code": status.HTTP_200_OK,
-                "message": "판례 상세 정보를 성공적으로 조회했습니다.",
-                "data": {
-                    "case_number": precedent.get("caseNo", ""),
-                    "case_title": precedent.get("caseTitle", ""),
-                    "case_name": precedent.get("caseNm", ""),
-                    "court": precedent.get("courtNm", ""),
-                    "judgment_date": precedent.get("judmnAdjuDe", ""),
-                    "precedent_id": precedent.get("판례일련번호"),
-                    "issue": precedent.get("판시사항", ""),
-                    "holding": precedent.get("판결요지", ""),
-                    "content": precedent_content,
-                    "summary": ai_summary
-                }
-            }
-            
-            return Response(response_data, status=status.HTTP_200_OK)
-            
-        except ConnectionError as e:
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_503_SERVICE_UNAVAILABLE,
-                    "message": str(e)
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        except Exception as e:
-            logging.error(f"판례 상세 조회 중 오류 발생: {e}", exc_info=True)
-            return Response(
-                {
-                    "status": "error",
-                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "message": f"서버 내부 오류가 발생했습니다: {str(e)}"
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+    def get(self, request, precedents_id, *args, **kwargs):
 
+        if not OpenSearchService.check_connection():
+            raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
+
+        precedent = OpenSearchService.get_precedent_by_case_number(precedents_id)
+
+        precedent_content = precedent.get("content", "")
+
+        ai_summary = GeminiService.summarize_precedent_langchain(precedent_content)
+
+        response_data = {
+            "status": "success",
+            "code": status.HTTP_200_OK,
+            "message": "판례 상세 정보를 성공적으로 조회했습니다.",
+            "data": {
+                "case_number": precedent.get("caseNo", ""),
+                "case_title": precedent.get("caseTitle", ""),
+                "case_name": precedent.get("caseNm", ""),
+                "court": precedent.get("courtNm", ""),
+                "judgment_date": precedent.get("judmnAdjuDe", ""),
+                "precedent_id": precedent.get("판례일련번호"),
+                "issue": precedent.get("판시사항", ""),
+                "holding": precedent.get("판결요지", ""),
+                "content": precedent_content,
+                "summary": ai_summary
+            }
+        }
+            
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class CaseAnswerView(APIView):
-    """
-    여러 판례 번호를 기반으로 종합적인 법률 솔루션을 생성하는 API
-    """
     @swagger_auto_schema(
-        request_body=CaseAnswerPostRequestSerializer,
-        responses={
-            status.HTTP_200_OK: CaseAnswerApiResponseSerializer,
-            status.HTTP_400_BAD_REQUEST: "잘못된 요청 형식입니다.",
-            status.HTTP_404_NOT_FOUND: "일부 또는 전체 판례를 찾을 수 없습니다.",
-            status.HTTP_500_INTERNAL_SERVER_ERROR: "서버 내부 오류가 발생했습니다."
-        },
-        operation_summary="종합 판례 분석 및 솔루션 제공 API",
+        operation_summary="판례 기반 심층 분석",
         operation_description=(
-            "판례 번호 리스트를 POST하면, 해당 판례들을 OpenSearch에서 조회하고 Gemini를 통해 종합 분석하여, "
-            "구체적인 법률 솔루션(결과 예측, 실행 로드맵, 증거 전략, 법적 근거)을 구조화된 JSON 형태로 반환합니다."
+                "사용자가 저장한 사건 ID(case_id)와 선택한 판례 번호(precedents_id)를 비교 분석합니다. "
+                "Gemini 3 Pro 모델을 사용하여 승소 확률과 대응 로드맵을 생성합니다."
         ),
+        manual_parameters=[
+            openapi.Parameter(
+                'precedents_id',
+                openapi.IN_PATH,
+                description="분석 기준이 되는 판례의 사건번호",
+                type=openapi.TYPE_STRING,
+                required=True,
+                example="2021도1234"
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['case_id'],
+            properties={
+                'case_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="사용자 상황이 저장된 Case 테이블의 고유 ID",
+                    example=1
+                )
+            }
+        ),
+        responses={
+            200: CaseAnswerApiResponseSerializer,
+            404: "사건 정보 또는 판례를 찾을 수 없음",
+            503: "OpenSearch 서버 연결 실패"
+        },
         tags=["cases"]
     )
-    def post(self, request, case_id, *args, **kwargs):
-        print(f"DEBUG: CaseAnswerView post method hit for case_id: {case_id}")
-        serializer = CaseAnswerPostRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, precedents_id, *args, **kwargs):
 
-        try:
-            case_nos = serializer.validated_data['case_no']
-            if not case_nos:
-                return Response(
-                    {"status": "error", "message": "판례 번호 목록이 비어 있습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        if not OpenSearchService.check_connection():
+            return Response({"error": "OpenSearch 연결 실패"}, status=503)
 
-            # 1. OpenSearch 연결 확인
-            if not OpenSearchService.check_connection():
-                raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
+        case_id = request.data.get('case_id')
+        case_obj = Case.objects.get(id=case_id)
 
-            # 2. 여러 판례 한 번에 조회
-            precedents = OpenSearchService.get_precedents_by_case_numbers(case_nos)
-            
-            if not precedents:
-                return Response(
-                    {"status": "error", "message": "요청된 판례를 하나도 찾을 수 없습니다.", "searched_case_nos": case_nos},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+        user_situation = {
+            'who': case_obj.who, 'when': case_obj.when,
+            'what': case_obj.what, 'want': case_obj.want, 'detail': case_obj.detail
+        }
 
-            # 3. 판례 내용 추출
-            precedent_contents = [p.get("판례내용", "") for p in precedents if p.get("판례내용")]
-            if not precedent_contents:
-                return Response(
-                    {"status": "error", "message": "조회된 판례 중에 유효한 내용이 없습니다."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+        precedents = OpenSearchService.get_precedent_by_case_number(precedents_id)
+        if not precedents:
+            return Response({"error": "판례를 찾을 수 없습니다."}, status=404)
 
-            # 4. Gemini를 통해 종합 분석 수행
-            analysis_result = GeminiService.generate_answer_from_precedents(precedent_contents)
+        analysis_result = GeminiService.analyze_case_deeply(user_situation, precedents.get("content", ""))
 
-            if "error" in analysis_result:
-                return Response(
-                    {"status": "error", "message": "AI 분석 중 오류가 발생했습니다.", "details": analysis_result.get("details")},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        final_response = {
+            "status": "success",
+            "data": analysis_result
+        }
 
-            # 5. 응답 데이터 구성
-            analysis_result['case_id'] = f"LAW-{case_id}"
-
-            response_data = {
-                "status": "success",
-                "data": analysis_result
-            }
-
-            # 6. 응답 데이터 유효성 검사
-            response_serializer = CaseAnswerApiResponseSerializer(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
-
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-        except ConnectionError as e:
-            return Response(
-                {"status": "error", "message": str(e)},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        except NotFoundError as e:
-            return Response(
-                {"status": "error", "message": str(e)},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            logging.error(f"종합 판례 분석 중 오류 발생: {e}", exc_info=True)
-            return Response(
-                {"status": "error", "message": f"서버 내부 오류가 발생했습니다: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response(final_response, status=status.HTTP_200_OK)
