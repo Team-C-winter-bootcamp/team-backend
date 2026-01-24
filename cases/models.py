@@ -68,7 +68,6 @@ class Case(models.Model):
 
 
 class Template(models.Model):
-    """문서 템플릿 테이블 (templates)"""
     TYPE_CHOICES = [
         ('고소장', '고소장'),
         ('내용증명', '내용증명'),
