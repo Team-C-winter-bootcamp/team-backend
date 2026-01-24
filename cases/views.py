@@ -133,8 +133,42 @@ class PrecedentDetailView(APIView):
 
 
 class CaseAnswerView(APIView):
+    @swagger_auto_schema(
+        operation_summary="판례 기반 심층 분석",
+        operation_description=(
+                "사용자가 저장한 사건 ID(case_id)와 선택한 판례 번호(precedents_id)를 비교 분석합니다. "
+                "Gemini 3 Pro 모델을 사용하여 승소 확률과 대응 로드맵을 생성합니다."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'precedents_id',
+                openapi.IN_PATH,
+                description="분석 기준이 되는 판례의 사건번호",
+                type=openapi.TYPE_STRING,
+                required=True,
+                example="2021도1234"
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['case_id'],
+            properties={
+                'case_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="사용자 상황이 저장된 Case 테이블의 고유 ID",
+                    example=1
+                )
+            }
+        ),
+        responses={
+            200: CaseAnswerApiResponseSerializer,
+            404: "사건 정보 또는 판례를 찾을 수 없음",
+            503: "OpenSearch 서버 연결 실패"
+        },
+        tags=["cases"]
+    )
     def post(self, request, precedents_id, *args, **kwargs):
-        # 1. 연결 확인
+
         if not OpenSearchService.check_connection():
             return Response({"error": "OpenSearch 연결 실패"}, status=503)
 
@@ -152,12 +186,9 @@ class CaseAnswerView(APIView):
 
         analysis_result = GeminiService.analyze_case_deeply(user_situation, precedents.get("content", ""))
 
-        analysis_result['case_id'] = f"LAW-{case_id}"
-
         final_response = {
             "status": "success",
             "data": analysis_result
         }
 
         return Response(final_response, status=status.HTTP_200_OK)
-
