@@ -18,7 +18,7 @@ OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "localhost")
 OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 9200))
 
 EMBEDDING_MODEL = "models/text-embedding-004"
-GEMINI_MODEL = "gemini-3-flash-preview"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL")
 
 if not GEMINI_MODEL:
     raise ValueError("GEMINI_MODEL 환경 변수가 설정되지 않았습니다.")
@@ -242,13 +242,48 @@ class OpenSearchService:
         if not client.ping():
             raise ConnectionError("OpenSearch 서버에 연결할 수 없습니다.")
 
+        # 올바른 인덱스(precedents_chunked)를 대상으로, 문서 내부의 id 필드를 검색
+        search_query = {
+            "size": 100,  # 한 판례가 100개 이상의 청크를 갖는 경우는 드물 것으로 가정
+            "query": {
+                "term": {
+                    "id.keyword": case_no  # 'id' 필드를 키워드로 정확히 매칭
+                }
+            },
+            "_source": True  # 모든 필드를 가져옴
+        }
+
         try:
-            response = client.get(
-                index="precedents",
-                id=case_no
+            response = client.search(
+                index="precedents_chunked",
+                body=search_query
             )
-            return response['_source']
+
+            hits = response['hits']['hits']
+            if not hits:
+                return None
+
+            # 모든 청크의 'chunk_content'를 합쳐 전체 내용 복원
+            # 'index_merged_precedents.py'에서 'chunk_content'로 저장했으므로 해당 필드 사용
+            full_content = "\n".join(hit['_source'].get('chunk_content', '') for hit in hits)
+
+            # 첫 번째 청크의 메타데이터를 기반으로 응답 객체 생성
+            first_hit_source = hits[0]['_source']
+            precedent_data = {
+                "id": first_hit_source.get("id"),
+                "caseNm": first_hit_source.get("caseNm"),
+                "courtNm": first_hit_source.get("court"),
+                "judmnAdjuDe": first_hit_source.get("date"),
+                "content": full_content  # 복원된 전체 내용으로 교체
+            }
+            # 첫번째 청크에 있는 다른 필드들도 필요시 추가
+            precedent_data.update(first_hit_source)
+
+
+            return precedent_data
+
         except NotFoundError:
             return None
         except Exception as e:
+            logging.error(f"판례 조회 중 예외 발생: {e}")
             raise ValueError(f"판례 조회 중 오류 발생: {str(e)}")
