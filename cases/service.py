@@ -66,45 +66,37 @@ class GeminiService:
             raise ValueError("임베딩 결과를 찾을 수 없습니다.")
 
         return embedding_result.embeddings[0].values
-    
+
     @classmethod
     def summarize_precedent_langchain(cls, precedent_content: str) -> str:
         llm = cls.get_llm()
 
         template = """
-        당신은 대한민국 대법원 판결문을 분석하고 요약하는 전문 법률 상담가입니다. 
-        제공된 판례 전문을 바탕으로 다음 지침에 따라 분석 결과를 작성하세요.
+        당신은 대한민국 대법원 판결문 분석 전문가입니다.
 
-        [지침]
-        1. 사건 요약: 판례의 핵심 내용, 판결 결과, 주요 판단 근거를 포함하여 '반드시 2~3줄'로 작성하세요.
-        2. 주요 쟁점: 이 사건에서 법적으로 다투어진 핵심 이슈와 법원의 판단 기준을 '반드시 3~4줄'로 상세히 작성하세요.
-        3. 어조: 전문적이고 객관적인 법률 용어를 사용하세요.
-        4. 형식: 아래의 구분선을 사용하여 출력하세요.
+        [작성 지침]
+        1. 모든 강조 기호(**)를 제거하고, 인사말 없이 본론만 작성하세요.
+        2. 결과 요약: 기호 '■'를 사용하지 말고, 내용은 한 문단으로 간결하게 작성하세요.
+        3. 사실관계: 기호 '·'를 사용하지 말고, 줄바꿈 횟수를 최소화하되 가독성을 위해 문장 시작 시 공백 2칸을 넣으세요.
+        4. 불필요한 빈 줄(Blank line)을 생성하지 마세요.
 
-        ---
-        - 사건 요약
-        (내용 작성)
+        [형식]
+        결과 요약
+        ■ --- 사건 요약 - 주요 쟁점 ---
 
-        - 주요 쟁점
-        (내용 작성)
-        ---
+        사실관계
+        ·   첫 번째 사실관계 내용입니다.
+        ·   두 번째 사실관계 내용입니다.
 
         [판례 전문]
         {precedent_content}
         """
 
         prompt = PromptTemplate.from_template(template)
-
-        # 2. LangChain 표현식(LCEL)을 이용한 체인 구성
         chain = prompt | llm | StrOutputParser()
 
-        try:
-            # 3. 체인 실행
-            response = chain.invoke({"precedent_content": precedent_content})
-            return response
-        except Exception as e:
-            logging.error(f"LangChain 요약 중 오류 발생: {str(e)}")
-            return f"요약 생성 중 오류가 발생했습니다: {str(e)[:100]}"
+        return chain.invoke({"precedent_content": precedent_content})
+
 
     @classmethod
     def analyze_case_deeply(cls, user_situation: Dict[str, Any], content_text: str) -> Dict[str, Any]:
@@ -223,8 +215,8 @@ class OpenSearchService:
             if p_id and p_id not in unique_precedents:
                 source = hit['_source']  # OpenSearch에서 가져온 원본 데이터
                 unique_precedents[p_id] = {
-                    "id": source.get("id"),  # 사건번호 (caseNo)
-                    "case_number": source.get("caseNm"),  # 사건명
+                    "case_No": source.get("id"),  # 사건번호 (caseNo)
+                    "case_name": source.get("caseNm"),  # 사건명
                     "case_title": source.get("title"),  # 판례 제목
                     "law_category": source.get("category"),  # 대분류 (민사/형사 등)
                     "law_subcategory": source.get("subcategory"),  # 소분류 (배임/해임 등)
