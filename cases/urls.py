@@ -37,7 +37,6 @@ urlpatterns = [
     path('<int:case_id>/document-sessions/<uuid:session_id>/messages/', DocumentSessionMessageView.as_view(), name='document_session_message'),
     path('<int:case_id>/document-sessions/<uuid:session_id>/stream/', DocumentSessionStreamView.as_view(), name='document_session_stream'),
     path('', CaseSearchView.as_view(), name='case_search'),
-    # 판례 조회 API
-    path('<str:precedents_id>/answer/', CaseAnswerView.as_view(), name='case_answer'),
+    path('answer/<str:precedents_id>/', CaseAnswerView.as_view(), name='case_answer'),
     path('<str:precedents_id>/', PrecedentDetailView.as_view(), name='precedent_detail'),
 ]

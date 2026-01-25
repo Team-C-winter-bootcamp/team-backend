@@ -1,5 +1,4 @@
 services:
-
   backend:
     build:
       context: .
@@ -12,8 +11,10 @@ services:
     volumes:
       - ./:/app
     restart: always
+    # [수정] 서비스 이름 뒤에 콜론(:) 제거 및 조건부 대기 추가
     depends_on:
-      - opensearch
+      opensearch:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: >
@@ -21,11 +22,9 @@ services:
       python wait_postgres.py &&
       python manage.py makemigrations &&
       python manage.py migrate &&
-      pip install -r requirements.txt &&
-      python index_merged_precedents.py &&
       python manage.py runserver 0.0.0.0:8000
       "
-#  python index_merged_precedents.py &&
+
   opensearch:
     image: opensearchproject/opensearch:latest
     container_name: opensearch-node
@@ -50,6 +49,12 @@ services:
       - "9200:9200"
       - "9600:9600"
     restart: always
+    # [추가] OpenSearch가 준비되었는지 확인하는 헬스체크
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:latest
@@ -57,14 +62,12 @@ services:
     ports:
       - "5601:5601"
     environment:
-      # OPENSEARCH_HOSTS는 서비스 이름인 'opensearch'를 바라봐야 합니다.
       - 'OPENSEARCH_HOSTS=["http://opensearch:9200"]'
       - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true"
     depends_on:
-      - opensearch
+      opensearch:
+        condition: service_healthy
     restart: always
 
-# 중복되었던 volumes 섹션을 하나로 통합했습니다.
 volumes:
-  postgres_data:  # RDS 사용 시 불필요
   opensearch-data:

@@ -32,5 +32,6 @@ if DB_ENGINE == "postgresql" or DB_ENGINE == "django.db.backends.postgresql":
 CORS_ORIGIN_ALLOW_ALL = True
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
+    'http://localhost:8000'
     # 만약 다른 배포 주소가 있다면 여기에 추가
 ]
