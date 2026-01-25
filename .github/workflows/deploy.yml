@@ -1,0 +1,84 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ] # main 브랜치에 push될 때 실행됩니다. 
+
+env:
+  # ECR 리포지토리 URI를 이곳에 변수로 설정합니다.
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_URI }}
+  # Docker 이미지 이름을 설정합니다.
+  IMAGE_NAME: law-loading-backend
+
+jobs:
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        run: |
+          # Docker 이미지를 빌드하고 태그를 지정합니다. 태그는 push할 때마다 고유하도록 GitHub SHA를 사용합니다.
+          docker build -t $ECR_REPOSITORY:$IMAGE_NAME-${{ github.sha }} .
+          # 이미지를 ECR에 푸시합니다.
+          docker push $ECR_REPOSITORY:$IMAGE_NAME-${{ github.sha }}
+          # 다음 job에서 이미지 태그를 사용할 수 있도록 output으로 설정합니다.
+          echo "::set-output name=image_tag::$IMAGE_NAME-${{ github.sha }}"
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push # build-and-push job이 성공해야 실행됩니다.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2 instance
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            # EC2 서버에서 실행될 스크립트입니다.
+            cd ~ # 홈 디렉토리로 이동
+
+            # 프로젝트 폴더가 없으면 git clone을 실행합니다.
+            if [ ! -d "team-backend" ]; then
+              git clone https://github.com/${{ github.repository }}.git team-backend
+            fi
+            
+            cd team-backend
+
+            # 최신 코드를 pull 받습니다.
+            git pull origin main
+
+            # Docker Compose를 사용하여 애플리케이션을 실행합니다.
+            # ECR_REPOSITORY와 IMAGE_TAG 환경변수를 docker-compose.prod.yml 파일에서 사용합니다.
+            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
+            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
+            docker-compose -f docker-compose.prod.yml down
+
+            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
+            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
+            docker-compose -f docker-compose.prod.yml pull backend
+            
+            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
+            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
+            docker-compose -f docker-compose.prod.yml up -d --build
+
+            # 사용하지 않는 Docker 이미지를 정리하여 디스크 공간을 확보합니다.
+            docker image prune -af

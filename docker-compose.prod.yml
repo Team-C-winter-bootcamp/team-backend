@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  backend:
+    # 'build' 대신 ECR의 이미지를 사용합니다.
+    # 변수는 GitHub Actions에서 전달됩니다.
+    image: ${{ECR_REPOSITORY}}:${IMAGE_TAG}
+    container_name: backend
+    env_file:
+      - .env.prod # 운영용 환경변수 파일을 사용합니다.
+    ports:
+      - "8000:8000"
+    restart: always
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    # 운영 환경에서는 Gunicorn을 사용하여 앱을 실행합니다.
+    command: >
+      bash -c "
+      python manage.py migrate &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000
+      "
+
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch-node
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - 'OPENSEARCH_HOSTS=["http://opensearch:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  opensearch-data:

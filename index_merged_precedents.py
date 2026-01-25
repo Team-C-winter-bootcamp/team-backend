@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -45,6 +46,16 @@ def smart_split(text_list: List[str]) -> List[str]:
 
 def create_indices():
     """모든 정보를 담을 수 있도록 인덱스 매핑 생성"""
+    # 'reindex' 인자가 있으면 기존 인덱스 삭제
+    if 'reindex' in sys.argv:
+        logging.info("Re-indexing requested. Deleting existing indices.")
+        if opensearch_client.indices.exists(index=CHUNKED_INDEX_NAME):
+            opensearch_client.indices.delete(index=CHUNKED_INDEX_NAME)
+            logging.info(f"Deleted index: {CHUNKED_INDEX_NAME}")
+        if opensearch_client.indices.exists(index=PRECEDENTS_INDEX_NAME):
+            opensearch_client.indices.delete(index=PRECEDENTS_INDEX_NAME)
+            logging.info(f"Deleted index: {PRECEDENTS_INDEX_NAME}")
+
     # 1. 벡터 검색 인덱스 (청크 단위)
     if not opensearch_client.indices.exists(index=CHUNKED_INDEX_NAME):
         body = {
@@ -65,6 +76,7 @@ def create_indices():
             }
         }
         opensearch_client.indices.create(index=CHUNKED_INDEX_NAME, body=body)
+        logging.info(f"Created index: {CHUNKED_INDEX_NAME}")
 
     # 2. 전체 데이터 저장 인덱스 (전문 + 모든 필드)
     if not opensearch_client.indices.exists(index=PRECEDENTS_INDEX_NAME):
@@ -81,6 +93,7 @@ def create_indices():
             }
         }
         opensearch_client.indices.create(index=PRECEDENTS_INDEX_NAME, body=body)
+        logging.info(f"Created index: {PRECEDENTS_INDEX_NAME}")
 
 
 def index_documents():
@@ -112,7 +125,8 @@ def index_documents():
                     "court": data.get("courtNm"),  # 법원명
                     "date": data.get("judmnAdjuDe"),  # 선고일자
                     "preview": data.get("jdgmn"),  # 미리보기
-                    "content_embedding": res.embeddings[0].values #어짜피 한개만 embeding함
+                    "chunk_content": chunk,  # 실제 청크 내용 추가
+                    "content_embedding": res.embeddings[0].values  # 어짜피 한개만 embeding함
                 }
 
                 # 인덱싱 (ID는 중복 방지를 위해 사건번호_순번 사용)
