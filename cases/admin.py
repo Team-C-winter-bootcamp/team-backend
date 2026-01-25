@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Question, Case, Template
+from .models import Category, Question, Case
 
 
 @admin.register(Category)
@@ -58,12 +58,3 @@ class CaseAdmin(admin.ModelAdmin):
 
     what_preview.short_description = '사건 내용 요약'
 
-
-@admin.register(Template)
-class TemplateAdmin(admin.ModelAdmin):
-    """템플릿 관리"""
-    list_display = ('template_id', 'type', 'is_deleted', 'created_at', 'updated_at')
-    list_filter = ('type', 'is_deleted', 'created_at')
-    search_fields = ('type',)
-    list_editable = ('is_deleted',)
-    ordering = ('-created_at',)

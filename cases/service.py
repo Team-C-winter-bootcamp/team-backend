@@ -28,7 +28,7 @@ class GeminiService:
     _llm: Optional[ChatGoogleGenerativeAI] = None
 
     @classmethod
-    def get_llm(cls, temperature: float = 0.2) -> ChatGoogleGenerativeAI:
+    def get_llm(cls, temperature: float = 0.0) -> ChatGoogleGenerativeAI:
         if cls._llm is None:
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
@@ -99,13 +99,18 @@ class GeminiService:
 
     @classmethod
     def analyze_case_deeply(cls, user_situation: Dict[str, Any], content_text: str) -> Dict[str, Any]:
-        llm = cls.get_llm(temperature=0.2)
+        llm = cls.get_llm()
 
-        situation_str = f"대상: {user_situation.get('who', '')} / 사건: {user_situation.get('what', '')}\n상세: {user_situation.get('detail', '')}"
+        situation_str = (
+            f"대상: {user_situation.get('who', '')} / "
+            f"사건: {user_situation.get('what', '')}\n"
+            f"상세 내용: {user_situation.get('detail', '')}\n"
+            f"사용자 요구사항: {user_situation.get('want', '적절한 법적 조언 및 해결책 수립')}"
+        )
         precedent_str = content_text[:10000]
 
         template = """당신은 대한민국 법률 전문가입니다.
-
+    
         [사용자 상황]
         {situation_text}
 
@@ -172,16 +177,14 @@ class OpenSearchService:
     @classmethod
     def get_client(cls) -> OpenSearch:
         if cls._client is None:
-            # 환경 변수에서 호스트를 가져오되, 없으면 'localhost'를 기본값으로 사용
-            host = os.environ.get("OPENSEARCH_HOST", "localhost") 
+            host = os.environ.get("OPENSEARCH_HOST", "localhost")
             port = int(os.environ.get("OPENSEARCH_PORT", 9200))
-            
+
             cls._client = OpenSearch(
                 hosts=[{'host': host, 'port': port}],
                 http_conn_class=RequestsHttpConnection,
                 use_ssl=False,
                 verify_certs=False,
-                # 연결 재시도 설정 추가 (서버가 뜰 때까지 대기)
                 retry_on_timeout=True,
                 max_retries=3
             )

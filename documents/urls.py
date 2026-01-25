@@ -1,7 +1,6 @@
 from django.urls import path
-from .views import DocumentGenerateView, DocumentGenerateFromSituationView
+from .views import DocumentView
 
 urlpatterns = [
-    path('generate/', DocumentGenerateView.as_view(), name='document_generate'),
-    path('generate-from-situation/', DocumentGenerateFromSituationView.as_view(), name='document_generate_from_situation'),
+    path('', DocumentView.as_view(), name='case_document_create'),
 ]

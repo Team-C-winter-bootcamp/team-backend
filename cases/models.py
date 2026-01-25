@@ -2,9 +2,6 @@ from django.db import models
 
 
 class Category(models.Model):
-    """카테고리 테이블 (categories)"""
-    # Django는 기본적으로 'id' 필드를 자동 생성하지만,
-    # ERD에 맞춰 이름을 명시적으로 지정할 수도 있습니다.
     category_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, verbose_name="카테고리 이름")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -16,9 +13,7 @@ class Category(models.Model):
 
 
 class Question(models.Model):
-    """질문 테이블 (questions)"""
     question_id = models.AutoField(primary_key=True)
-    # 카테고리와 1:N 관계
     category = models.ForeignKey(
         Category,
         on_delete=models.CASCADE,
@@ -66,22 +61,3 @@ class Case(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
 
-
-class Template(models.Model):
-    TYPE_CHOICES = [
-        ('고소장', '고소장'),
-        ('내용증명', '내용증명'),
-        ('합의서', '합의서'),
-    ]
-
-    template_id = models.AutoField(primary_key=True)
-    # Enum 타입을 Django의 choices로 구현
-    type = models.CharField(
-        max_length=20,
-        choices=TYPE_CHOICES,
-        default='고소장',
-        verbose_name="템플릿 타입"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    is_deleted = models.BooleanField(default=False)

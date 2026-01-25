@@ -12,7 +12,7 @@ TEMPLATES = [
     # 1. 내용증명서 (proof_of_contents)
     # -------------------------------------------------------------------------
     {
-        "doc_type": "proof_of_contents",
+        "doc_type": "내용증명서",
         "name": "내용증명서 v1",
         "version": 1,
         "variables": [
@@ -60,7 +60,7 @@ TEMPLATES = [
     # 2. 고소장 (criminal_complaint_fraud)
     # -------------------------------------------------------------------------
     {
-        "doc_type": "criminal_complaint_fraud",
+        "doc_type": "고소장",
         "name": "고소장 v1",
         "version": 1,
         "variables": [
@@ -114,7 +114,7 @@ TEMPLATES = [
     # 3. 합의서 (settlement_agreement)
     # -------------------------------------------------------------------------
     {
-        "doc_type": "settlement_agreement",
+        "doc_type": "합의서",
         "name": "합의서 v1",
         "version": 1,
         "variables": [
@@ -168,48 +168,26 @@ TEMPLATES = [
 ]
 
 
+# documents/management/commands/seed_templates.py
+
 class Command(BaseCommand):
-    help = "문서 템플릿을 DB에 시드합니다. (idempotent - 중복 실행 안전)"
+    help = "문서 템플릿을 DB에 시드합니다."
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING("템플릿 시드 시작..."))
-        self.stdout.write("")
 
-        created_count = 0
-        updated_count = 0
-
-        for template_data in TEMPLATES:
+        for data in TEMPLATES:
+            # 매핑: doc_type -> type / content_md -> content
+            # 모델에 없는 name, variables, version 필드는 무시하거나 defaults에서 제외해야 합니다.
             template, created = Template.objects.update_or_create(
-                doc_type=template_data["doc_type"],
-                version=template_data["version"],
+                type=data["doc_type"] if "doc_type" in data else data["type"],
                 defaults={
-                    "name": template_data["name"],
-                    "content_md": template_data["content_md"],
-                    "variables": template_data["variables"],
-                    "is_active": True,
+                    "content": data["content_md"] if "content_md" in data else data["content"],
+                    "is_deleted": False,
                 },
             )
 
-            if created:
-                created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  [생성] {template.name} "
-                        f"(doc_type={template.doc_type}, version={template.version})"
-                    )
-                )
-            else:
-                updated_count += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  [업데이트] {template.name} "
-                        f"(doc_type={template.doc_type}, version={template.version})"
-                    )
-                )
+            status = "생성" if created else "업데이트"
+            self.stdout.write(self.style.SUCCESS(f"  [{status}] {template.type}"))
 
-        self.stdout.write("")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"템플릿 시드 완료! (생성: {created_count}개, 업데이트: {updated_count}개)"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS("템플릿 시드 완료!"))
