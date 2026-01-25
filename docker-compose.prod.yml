@@ -4,7 +4,7 @@ services:
   backend:
     # 'build' 대신 ECR의 이미지를 사용합니다.
     # 변수는 GitHub Actions에서 전달됩니다.
-    image: ${{ECR_REPOSITORY}}:${IMAGE_TAG}
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG}
     container_name: backend
     env_file:
       - .env.prod # 운영용 환경변수 파일을 사용합니다.
