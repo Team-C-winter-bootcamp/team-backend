@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'corsheaders',
     'cases',
+    'documents',
 ]
 
 MIDDLEWARE = [
