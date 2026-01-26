@@ -7,7 +7,7 @@ services:
     networks:
       - traefik-public
     environment:
-      - DOCKER_API_VERSION=1.44
+      - DOCKER_API_VERSION=${DOCKER_API_VERSION}
     command:
       - "--providers.docker=true"
       # Traefik이 백엔드와 통신할 네트워크 명시
