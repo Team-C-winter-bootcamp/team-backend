@@ -1,6 +1,4 @@
-    """
-Django 기본 설정
-"""
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
