@@ -17,6 +17,7 @@ services:
     # 운영 환경에서는 Gunicorn을 사용하여 앱을 실행합니다.
     command: >
       bash -c "
+      python manage.py collectstatic --no-input &&
       python manage.py migrate &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000
       "
