@@ -15,10 +15,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / "backend.env")
 
-# [수정] 클라이언트 초기화 부분
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "").replace('https://', '').replace('http://', '')
-OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443)) # AWS 퍼블릭은 443
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443))
 
+OPENSEARCH_USERNAME = os.environ.get("OPENSEARCH_USERNAME")
+OPENSEARCH_PASSWORD = os.environ.get("OPENSEARCH_PASSWORD")
+
+if not all([OPENSEARCH_HOST, OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD]):
+    raise RuntimeError("OpenSearch 환경변수가 설정되지 않았습니다.")
 
 CHUNKED_INDEX_NAME = "precedents_chunked"
 PRECEDENTS_INDEX_NAME = "precedents"
@@ -27,13 +31,14 @@ VECTOR_DIMENSION = 768
 
 MERGED_DATA_DIR = Path(__file__).parent / "data" / "merged"
 
-# 클라이언트 초기화
-genai_client = genai.Client(api_key=GEMINI_API_KEY)
 opensearch_client = OpenSearch(
-    hosts=[{'host': OPENSEARCH_HOST, 'port': OPENSEARCH_PORT}],
-    http_conn_class=RequestsHttpConnection,
-    use_ssl=False, verify_certs=False,
+    hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
+    http_auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
+    use_ssl=True,
+    verify_certs=True,
 )
+
+genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def smart_split(text_list: List[str]) -> List[str]:
     combined_text = "\n".join([t for t in text_list if t])

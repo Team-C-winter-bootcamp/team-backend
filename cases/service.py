@@ -13,9 +13,10 @@ import json
 from opensearchpy import OpenSearch, RequestsHttpConnection, NotFoundError
 import google.genai as genai
 
-# 설정 상수
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "")
-OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT"))
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
+OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443))
+OPENSEARCH_USERNAME = os.environ.get("OPENSEARCH_USERNAME")
+OPENSEARCH_PASSWORD = os.environ.get("OPENSEARCH_PASSWORD")
 
 EMBEDDING_MODEL = "models/text-embedding-004"
 GEMINI_MODEL = "gemini-3-flash-preview"
@@ -177,16 +178,13 @@ class OpenSearchService:
     @classmethod
     def get_client(cls) -> OpenSearch:
         if cls._client is None:
-            host = os.environ.get("OPENSEARCH_HOST", "localhost")
-            port = int(os.environ.get("OPENSEARCH_PORT", 9200))
-
             cls._client = OpenSearch(
-                hosts=[{'host': host, 'port': port}],
-                http_conn_class=RequestsHttpConnection,
-                use_ssl=False,
-                verify_certs=False,
+                hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
+                http_auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
+                use_ssl=True,
+                verify_certs=True,
                 retry_on_timeout=True,
-                max_retries=3
+                max_retries=3,
             )
         return cls._client
 
