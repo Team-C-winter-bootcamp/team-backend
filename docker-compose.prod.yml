@@ -2,19 +2,17 @@ version: '3.8'
 
 services:
   backend:
-    # 'build' 대신 ECR의 이미지를 사용합니다.
-    # 변수는 GitHub Actions에서 전달됩니다.
     image: ${ECR_REPOSITORY}:${IMAGE_TAG}
     container_name: backend
     env_file:
-      - .env.prod # 운영용 환경변수 파일을 사용합니다.
+      - .env.prod
     ports:
       - "8000:8000"
     restart: always
-    # 운영 환경에서는 Gunicorn을 사용하여 앱을 실행합니다.
     command: >
       bash -c "
       python manage.py collectstatic --no-input &&
       python manage.py migrate &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000
       "
+

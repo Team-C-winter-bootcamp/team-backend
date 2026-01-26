@@ -77,7 +77,7 @@ jobs:
 
             # Docker Compose 실행
             echo "Stopping existing containers..."
-            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml down --remove-orphans
 
             echo "Pulling new image: $ECR_REPOSITORY:$IMAGE_TAG"
             docker-compose -f docker-compose.prod.yml pull backend

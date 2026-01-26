@@ -46,3 +46,4 @@ OPENSEARCH_CONFIG = {
     'connection_class': RequestsHttpConnection,
     'ssl_show_warn': False,
 }
+
