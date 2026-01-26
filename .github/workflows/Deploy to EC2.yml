@@ -66,20 +66,25 @@ jobs:
             # 최신 코드를 pull 받습니다.
             git pull origin main
 
+            # ECR 로그인 (중요: EC2 인스턴스에서 ECR 이미지를 pull 받으려면 인증이 필요합니다)
+            # 이 명령어가 작동하려면 EC2 인스턴스에 AWS CLI가 설치되어 있고,
+            # ECR에 접근 가능한 IAM 역할(Instance Profile)이 연결되어 있어야 합니다.
+            LOGIN_URL=$(echo "${{ env.ECR_REPOSITORY }}" | cut -d'/' -f1)
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $LOGIN_URL
+
             # Docker Compose를 사용하여 애플리케이션을 실행합니다.
             # ECR_REPOSITORY와 IMAGE_TAG 환경변수를 docker-compose.prod.yml 파일에서 사용합니다.
             ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
+            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
             docker-compose -f docker-compose.prod.yml down
 
             ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
+            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
             docker-compose -f docker-compose.prod.yml pull backend
             
             ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ steps.build-image.outputs.image_tag }} \
-            docker-compose -f docker-compose.prod.yml up -d --build
+            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
+            docker-compose -f docker-compose.prod.yml up -d
 
             # 사용하지 않는 Docker 이미지를 정리하여 디스크 공간을 확보합니다.
             docker image prune -af
-
