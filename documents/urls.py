@@ -1,6 +1,8 @@
 from django.urls import path
-from .views import DocumentView
+from .views import ComplaintView, NoticeView, AgreementView
 
 urlpatterns = [
-    path('', DocumentView.as_view(), name='case_document_create'),
+    path('complaint/', ComplaintView.as_view(), name='complaint-api'),
+    path('notice/', NoticeView.as_view(), name='notice-api'),
+    path('agreement/', AgreementView.as_view(), name='agreement-api'),
 ]

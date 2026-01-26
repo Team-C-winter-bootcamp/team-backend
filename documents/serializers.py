@@ -1,22 +1,19 @@
 from rest_framework import serializers
-from .models import Document
 
 class DocumentCreateRequestSerializer(serializers.Serializer):
-    type = serializers.CharField(help_text="문서 종류")
-    case_id = serializers.IntegerField(help_text="조회할 사건(Case)의 ID") # 수정됨
-    precedent = serializers.CharField(help_text="참고할 판례 내용")
+    case_id = serializers.IntegerField(help_text="사건 ID")
+    precedent = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="참고할 판례 내용 (선택 사항)"
+    )
+
+class DocumentPatchRequestSerializer(serializers.Serializer):
+    document_id = serializers.IntegerField(help_text="수정할 문서 ID")
+    user_request = serializers.CharField(help_text="AI에게 전달할 수정 요청 사항")
 
 class DocumentResponseSerializer(serializers.ModelSerializer):
     class Meta:
+        from .models import Document
         model = Document
-        fields = ['document_id', 'type', 'content']
-
-class DocumentPatchRequestSerializer(serializers.Serializer):
-    document_id = serializers.IntegerField(
-        required=True,
-        help_text="수정할 문서의 ID (DB 조회용)"
-    )
-    user_request = serializers.CharField(
-        required=True,
-        help_text="AI에게 내리는 수정 명령 (예: '이름을 박준제로 채워줘')"
-    )
+        fields = ['document_id', 'type', 'content',]
