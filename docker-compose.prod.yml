@@ -12,6 +12,7 @@ services:
       - "--providers.docker=true"
       # Traefik이 백엔드와 통신할 네트워크 명시
       - "--providers.docker.network=traefik-public"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
