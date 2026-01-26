@@ -1,4 +1,4 @@
-"""
+    """
 Django 기본 설정
 """
 import os
