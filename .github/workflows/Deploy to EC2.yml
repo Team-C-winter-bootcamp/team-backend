@@ -53,38 +53,37 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            # EC2 서버에서 실행될 스크립트입니다.
-            cd ~ # 홈 디렉토리로 이동
+            set -e # 명령어 실패 시 즉시 스크립트를 중단합니다.
 
-            # 프로젝트 폴더가 없으면 git clone을 실행합니다.
-            if [ ! -d "team-backend" ]; then
-              git clone https://github.com/${{ github.repository }}.git team-backend
-            fi
-            
-            cd team-backend
-
-            # 최신 코드를 pull 받습니다.
+            # 프로젝트 디렉토리로 이동합니다.
+            cd ~/team-backend
             git pull origin main
+            
+            echo "--- Starting Deployment ---"
+            echo "ECR Repository: ${{ env.ECR_REPOSITORY }}"
+            echo "AWS Region: ${{ secrets.AWS_REGION }}"
 
-            # ECR 로그인 (중요: EC2 인스턴스에서 ECR 이미지를 pull 받으려면 인증이 필요합니다)
-            # 이 명령어가 작동하려면 EC2 인스턴스에 AWS CLI가 설치되어 있고,
-            # ECR에 접근 가능한 IAM 역할(Instance Profile)이 연결되어 있어야 합니다.
+            # ECR 로그인
+            echo "Attempting to log in to ECR..."
             LOGIN_URL=$(echo "${{ env.ECR_REPOSITORY }}" | cut -d'/' -f1)
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $LOGIN_URL
+            echo "ECR login successful."
 
-            # Docker Compose를 사용하여 애플리케이션을 실행합니다.
-            # ECR_REPOSITORY와 IMAGE_TAG 환경변수를 docker-compose.prod.yml 파일에서 사용합니다.
-            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
+            # 환경 변수 설정
+            export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+            export IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+
+            # Docker Compose 실행
+            echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
 
-            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
+            echo "Pulling new image: $ECR_REPOSITORY:$IMAGE_TAG"
             docker-compose -f docker-compose.prod.yml pull backend
-            
-            ECR_REPOSITORY=${{ env.ECR_REPOSITORY }} \
-            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} \
+
+            echo "Starting new containers..."
             docker-compose -f docker-compose.prod.yml up -d
 
-            # 사용하지 않는 Docker 이미지를 정리하여 디스크 공간을 확보합니다.
+            echo "Cleaning up unused Docker images..."
             docker image prune -af
+            
+            echo "--- Deployment Finished ---"
