@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # 환경변수 로드
-env_path = os.path.join(BASE_DIR, "backend.env")
+env_path = os.path.join(BASE_DIR, ".env.prod")
 if os.path.exists(env_path):
     load_dotenv(env_path)
 
