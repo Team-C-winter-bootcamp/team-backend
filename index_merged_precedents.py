@@ -37,8 +37,6 @@ def smart_split(text_list: List[str]) -> List[str]:
     return [c.strip() for c in chunks if len(c.strip()) > 10]
 
 def create_indices():
-    """OpenSearch 인덱스 매핑 생성"""
-    # 1. 벡터 검색 인덱스 (청크 단위)
     if not opensearch_client.indices.exists(index=CHUNKED_INDEX_NAME):
         body = {
             "settings": {"index": {"knn": True}},
@@ -48,15 +46,20 @@ def create_indices():
                         "type": "knn_vector", "dimension": VECTOR_DIMENSION,
                         "method": {"name": "hnsw", "space_type": "l2", "engine": "faiss"}
                     },
-                    "caseNo": {"type": "keyword"},
+                    "id": {"type": "keyword"},
                     "caseNm": {"type": "text"},
+                    "title": {"type": "text"},
+                    "category": {"type": "keyword"},
+                    "subcategory": {"type": "keyword"},
+                    "court": {"type": "keyword"},
+                    "date": {"type": "date", "format": "yyyy-MM-dd"},
+                    "preview": {"type": "text"},
                     "chunk_content": {"type": "text"}
                 }
             }
         }
         opensearch_client.indices.create(index=CHUNKED_INDEX_NAME, body=body)
 
-    # 2. 전체 데이터 저장 인덱스 (TypeScript PrecedentDetailData 규격 반영)
     if not opensearch_client.indices.exists(index=PRECEDENTS_INDEX_NAME):
         body = {
             "mappings": {
@@ -89,7 +92,6 @@ def index_documents():
                 logging.warning(f"사건번호 누락: {file_path.name}")
                 continue
 
-            # --- 1. precedents_chunked 인덱싱 (벡터 검색용) ---
             summary_texts = [s.get("summ_contxt", "") for s in data.get("Summary", [])]
             target_texts = [
                 data.get("판시사항", ""),
@@ -100,37 +102,43 @@ def index_documents():
 
             for i, chunk in enumerate(chunks):
                 res = genai_client.models.embed_content(model=EMBEDDING_MODEL, contents=chunk)
+
                 chunk_body = {
-                    "caseNo": case_no,
-                    "caseNm": data.get("caseNm"),
-                    "chunk_content": chunk,
+                    "id": case_no,  # case_no 대신 id
+                    "caseNm": data.get("caseNm"),  # case_name 대신 caseNm
+                    "title": data.get("caseTitle"),  # title 추가
+                    "category": data.get("Class_info", {}).get("class_name"),  # 형사A(생활형) 등
+                    "subcategory": data.get("Class_info", {}).get("instance_name"),  # 배임 등
+                    "court": data.get("courtNm"),  # 법원명
+                    "date": data.get("judmnAdjuDe"),  # 선고일자
+                    "preview": data.get("jdgmn"),  # 미리보기 텍스트
+                    "chunk_content": chunk,  # 검색된 텍스트 조각
                     "content_embedding": res.embeddings[0].values
                 }
+
                 opensearch_client.index(
                     index=CHUNKED_INDEX_NAME,
                     body=chunk_body,
                     id=f"{case_no}_{i}"
                 )
 
-            # --- 2. precedents 인덱싱 (TypeScript 타입 규격 매핑) ---
+
             full_doc_body = {
-                "case_no": case_no,                               # 2001노688
-                "case_title": data.get("caseTitle"),              # 광주고등법원...
-                "case_name": data.get("caseNm"),                 # 특정경제범죄...
-                "court": data.get("courtNm"),                    # 광주고등법원
-                "judgment_date": data.get("judmnAdjuDe"),        # 2002-03-21
-                "precedent_id": data.get("판례일련번호"),           # 71594
-                "issue": data.get("판시사항", ""),                # 【판시사항】...
-                "content": data.get("판례내용", "")               # 【피고인】... 전문
+                "case_no": case_no,  # "2001노688"
+                "case_title": data.get("caseTitle"),  # "광주고등법원 2002. 3. 21. 선고..."
+                "case_name": data.get("caseNm"),  # "특정경제범죄가중처벌등에관한법률위반..."
+                "court": data.get("courtNm"),  # "광주고등법원"
+                "judgment_date": data.get("judmnAdjuDe"),  # "2002-03-21" (정제된 날짜)
+                "precedent_id": data.get("판례일련번호"),  # 71594 (숫자형)
+                "issue": data.get("판시사항", ""),  # 【판시사항】 전문
+                "content": data.get("판례내용", "")  # 【피고인】 전문
             }
 
-            # id=case_no를 명시하여 무작위 ID 생성을 방지하고 사건번호로 직접 GET 가능하게 함
             opensearch_client.index(
                 index=PRECEDENTS_INDEX_NAME,
                 body=full_doc_body,
                 id=case_no
             )
-
             logging.info(f"인덱싱 성공: {case_no}")
 
         except Exception as e:

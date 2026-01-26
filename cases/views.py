@@ -93,10 +93,10 @@ class PrecedentDetailView(APIView):
         return Response({
             "status": "success",
             "data": {
-                "case_no": precedent.get("id"),
+                "case_no": precedent.get("case_no"),
                 "court" : precedent.get("court"),
-                "case_name": precedent.get("caseNm"),
-                "judgment_date": precedent.get("date"),
+                "case_name": precedent.get("case_name"),
+                "judgment_date": precedent.get("judgment_date"),
                 "content": precedent.get("content"),
                 "summary": summary
             }
