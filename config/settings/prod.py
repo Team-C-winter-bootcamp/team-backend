@@ -12,11 +12,16 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
-# 3. CORS 설정: 프론트 배포 전이므로 임시로 모두 허용
-# 프론트 배포 후에는 반드시 특정 도메인만 허용하도록 수정해야 합니다.
-CORS_ALLOW_ALL_ORIGINS = True
+# 3. CORS 설정: 인증 정보를 포함할 경우 Origin을 명시해야 합니다.
+CORS_ALLOW_ALL_ORIGINS = False # 모두 허용(Wildcard) 기능을 끕니다.
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    f"http://{os.getenv('EC2_PUBLIC_IP', '13.125.95.179')}",
+]
+# 쿠키 및 인증 정보를 허용하기 위해 필수 설정
+CORS_ALLOW_CREDENTIALS = True 
 
-# 4. CSRF 설정: 프론트엔드(localhost:3000)에서 오는 요청을 신뢰하도록 설정
+# 4. CSRF 설정: 프론트엔드 도메인을 신뢰 목록에 추가
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     f"http://{os.getenv('EC2_PUBLIC_IP', '13.125.95.179')}",
