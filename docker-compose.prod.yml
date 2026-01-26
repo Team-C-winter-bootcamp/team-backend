@@ -1,20 +1,22 @@
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.0
     container_name: traefik
+    restart: always
     environment:
-      - DOCKER_API_VERSION=
+      # Docker 엔진이 요구하는 최소 API 버전 1.44를 명시합니다.
+      - DOCKER_API_VERSION=1.44
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      # HTTP로 접속하면 자동으로 HTTPS로 강제 이동 (Vercel 통신 필수 설정)
+      # HTTP -> HTTPS 리다이렉션 (v3에서도 동일하게 작동)
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # Let's Encrypt 설정
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      # 인증서 발급용 이메일 주소 반영
       - "--certificatesresolvers.myresolver.acme.email=wnswp1122@naver.com" 
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
@@ -32,10 +34,11 @@ services:
     restart: always
     labels:
       - "traefik.enable=true"
-      # 본인의 DuckDNS 도메인 주소
+      # 도메인 및 엔트리포인트 설정
       - "traefik.http.routers.backend.rule=Host(`law-loading-api.duckdns.org`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      # 백엔드 내부 포트 지정 (Gunicorn 8000 포트와 일치)
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
     command: >
       bash -c "
