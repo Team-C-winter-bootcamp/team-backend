@@ -11,10 +11,14 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 설정값
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "localhost")
-OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 9200))
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / "backend.env")
+
+# [수정] 클라이언트 초기화 부분
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "").replace('https://', '').replace('http://', '')
+OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443)) # AWS 퍼블릭은 443
+
 
 CHUNKED_INDEX_NAME = "precedents_chunked"
 PRECEDENTS_INDEX_NAME = "precedents"

@@ -7,9 +7,6 @@ if os.path.exists(env_path):
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
-# 데이터베이스 설정
-# DB_ENGINE 환경 변수로 데이터베이스 타입 결정
-# "postgresql" 또는 "sqlite3" 중 선택 가능
 DB_ENGINE = os.getenv("DB_ENGINE", "postgresql")
 DB_HOST = os.getenv("DB_HOST", "postgres")
 
@@ -33,5 +30,19 @@ CORS_ORIGIN_ALLOW_ALL = True
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:8000'
-    # 만약 다른 배포 주소가 있다면 여기에 추가
 ]
+from opensearchpy import RequestsHttpConnection
+
+import os
+
+OPENSEARCH_CONFIG = {
+    'hosts': [{
+        'host': os.getenv('OPENSEARCH_HOST').replace('https://', '').replace('http://', ''), # 프로토콜 강제 제거
+        'port': 443
+    }],
+    'http_auth': (os.getenv('OPENSEARCH_USER'), os.getenv('OPENSEARCH_PASSWORD')),
+    'use_ssl': True,              # 변수 대신 True 하드코딩으로 테스트
+    'verify_certs': True,
+    'connection_class': RequestsHttpConnection,
+    'ssl_show_warn': False,
+}

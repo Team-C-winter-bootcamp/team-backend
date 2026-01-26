@@ -14,8 +14,8 @@ from opensearchpy import OpenSearch, RequestsHttpConnection, NotFoundError
 import google.genai as genai
 
 # 설정 상수
-OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "localhost")
-OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 9200))
+OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST", "")
+OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT"))
 
 EMBEDDING_MODEL = "models/text-embedding-004"
 GEMINI_MODEL = "gemini-3-flash-preview"
