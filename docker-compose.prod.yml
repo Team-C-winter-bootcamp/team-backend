@@ -1,18 +1,41 @@
 version: '3.8'
 
 services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=your-email@example.com" # 본인 이메일
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
   backend:
     image: ${ECR_REPOSITORY}:${IMAGE_TAG}
     container_name: backend
     env_file:
       - .env.prod
-    ports:
-      - "8000:8000"
     restart: always
+    labels:
+      - "traefik.enable=true"
+      # 도메인 주소로 들어오는 요청을 이 컨테이너로 연결
+      - "traefik.http.routers.backend.rule=Host(`yourdomain.com`)" # 본인 도메인
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
     command: >
       bash -c "
       python manage.py collectstatic --no-input &&
       python manage.py migrate &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000
       "
-
