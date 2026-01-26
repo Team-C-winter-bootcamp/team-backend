@@ -22,15 +22,13 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/cases/', include('cases.urls')),
-
     # API docs
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('swagger', RedirectView.as_view(url='/swagger/', permanent=False), name='swagger-redirect'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     # Cases
-    path('api/cases/', include('cases.urls')),
-    path('api/documents/', include('documents.urls'))
+    path('cases/', include('cases.urls')),
+    path('documents/', include('documents.urls'))
 ]
 
 # 개발 환경에서 정적 파일 및 미디어 파일 제공
