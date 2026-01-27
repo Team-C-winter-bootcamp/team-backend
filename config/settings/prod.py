@@ -29,16 +29,13 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://lawding.vercel.app",   
-    "https://lawding.vercel.app/", 
-    "https://law-loading-api.duckdns.org", # 본인 백엔드 주소
+    "https://lawding.vercel.app",  # 슬래시 제거!
+    "https://law-loading-api.duckdns.org",
 ]
 
-# 5. CSRF 설정: 보안 토큰 신뢰 도메인
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
-    "https://lawding.vercel.app",
-    "https://lawding.vercel.app/", 
+    "https://lawding.vercel.app",  # 슬래시 제거!
     "https://law-loading-api.duckdns.org",
 ]
 
