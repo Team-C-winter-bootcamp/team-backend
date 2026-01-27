@@ -35,6 +35,7 @@ CORS_ALLOWED_ORIGINS = [
 
 # 5. CSRF 설정: 보안 토큰 신뢰 도메인
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
     "https://lawding.vercel.app",
     "https://law-loading-api.duckdns.org",
 ]
@@ -77,6 +78,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # 9. HTTPS 보안 강화 설정
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
