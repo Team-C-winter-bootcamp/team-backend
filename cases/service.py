@@ -5,7 +5,7 @@ from typing import List, Dict, Optional, Any
 # LangChain 관련 임포트
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser
 from typing import List as TypingList
 import json
 
@@ -69,32 +69,37 @@ class GeminiService:
         return embedding_result.embeddings[0].values
 
     @classmethod
-    def summarize_precedent_langchain(cls, precedent_content: str) -> str:
+    def summarize_precedent_langchain(cls, precedent_content: str) -> dict:
         llm = cls.get_llm()
 
+        # 사실관계를 단 1개로 제한하는 프롬프트
         template = """
-        당신은 대한민국 대법원 판결문 분석 전문가입니다.
+        당신은 판결문의 핵심 법리와 결과를 통찰력 있게 분석하는 법률 전문가입니다.
+        반드시 지정된 JSON 형식으로만 답변하세요.
 
         [작성 지침]
-        1. 모든 강조 기호(**)를 제거하고, 인사말 없이 본론만 작성하세요.
-        2. 결과 요약: 기호 '■'를 사용하지 말고, 내용은 한 문단으로 간결하게 작성하세요.
-        3. 사실관계: 기호 '·'를 사용하지 말고, 줄바꿈 횟수를 최소화하되 가독성을 위해 문장 시작 시 공백 2칸을 넣으세요.
-        4. 불필요한 빈 줄(Blank line)을 생성하지 마세요.
+        1. **core_summary**: 단순히 "상고 기각" 같은 결과만 적지 마십시오. 
+           '어떤 법적 쟁점(내용)에 대해 법원이 어떤 이유로 결론을 내렸는지'를 포함하여 임팩트 있는 한 문장으로 작성하십시오.
+           (예: "흉기 휴대 폭행은 상습범과 별개의 죄이며, 약식명령 확정 시 포괄일죄의 단절을 인정한 판결")
+        2. **key_fact**: 사건의 핵심 발단 1가지만 짧게 작성하십시오.
+        3. **verdict**: 최종 판결 상태(유죄 확정, 파기환송 등)를 적습니다.
+        4. **legal_point**: 법원의 판단 근거가 된 핵심 법리를 적습니다.
 
         [형식]
-        결과 요약
-        ■ --- 사건 요약 - 주요 쟁점 ---
-
-        사실관계
-        ·   첫 번째 사실관계 내용입니다.
-        ·   두 번째 사실관계 내용입니다.
+        {{
+            "core_summary": "쟁점과 결론이 포함된 통찰력 있는 요약",
+            "key_fact": "사건 발단",
+            "verdict": "판결 결과",
+            "legal_point": "법적 근거",
+            "tags": ["키워드1", "키워드2", "키워드3"]
+        }}
 
         [판례 전문]
         {precedent_content}
         """
 
         prompt = PromptTemplate.from_template(template)
-        chain = prompt | llm | StrOutputParser()
+        chain = prompt | llm | JsonOutputParser()
 
         return chain.invoke({"precedent_content": precedent_content})
 

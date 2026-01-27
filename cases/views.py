@@ -75,11 +75,37 @@ class PrecedentDetailView(APIView):
             )
         ],
         responses={
-            200: PrecedentDetailResponseSerializer,
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING, example="success"),
+                    "data": openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "case_no": openapi.Schema(type=openapi.TYPE_STRING, example="2023도1234"),
+                            "court": openapi.Schema(type=openapi.TYPE_STRING, example="대법원"),
+                            "case_name": openapi.Schema(type=openapi.TYPE_STRING, example="손해배상(기)"),
+                            "judgment_date": openapi.Schema(type=openapi.TYPE_STRING, example="2024.01.27"),
+                            "content": openapi.Schema(type=openapi.TYPE_STRING, description="판례 전문"),
+                            "summary": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                description="AI 구조화 요약 결과",
+                                properties={
+                                    "core_summary": openapi.Schema(type=openapi.TYPE_STRING, example="피고인의 상고를 기각하고 원심 판결을 확정함"),
+                                    "key_fact": openapi.Schema(type=openapi.TYPE_STRING, example="피고인이 교차로에서 전방 주시 의무를 위반하여 사고를 냄"),
+                                    "verdict": openapi.Schema(type=openapi.TYPE_STRING, example="기각 (유죄 확정)"),
+                                    "legal_point": openapi.Schema(type=openapi.TYPE_STRING, example="신뢰의 원칙 적용 범위 위반"),
+                                    "tags": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING), example=["교통사고", "주의의무", "대법원"])
+                                }
+                            )
+                        }
+                    )
+                }
+            ),
             404: openapi.Response(description="판례를 찾을 수 없습니다.")
         },
-        operation_summary="판례 상세 조회 및 요약",
-        operation_description="판례 사건번호로 판례 상세 정보를 조회하고 AI 요약을 제공합니다.",
+        operation_summary="판례 상세 조회 및 AI 분석",
+        operation_description="사건번호로 판례 정보와 AI가 구조화한 요약 데이터를 조회합니다.",
         tags=["cases"]
     )
     def get(self, request, precedents_id):
