@@ -26,6 +26,8 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('swagger', RedirectView.as_view(url='/swagger/', permanent=False), name='swagger-redirect'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    # Prometheus metrics
+    path('', include('django_prometheus.urls')),  # /metrics 엔드포인트 노출
     # Cases
     path('cases/', include('cases.urls')),
     path('documents/', include('documents.urls'))
