@@ -108,8 +108,10 @@ services:
 # 네트워크 정의 (하나로 통합)
 networks:
   traefik-public:
+    name: traefik-public  # 이 부분을 추가
     driver: bridge
   monitoring-net:
+    name: monitoring-net  # 이 부분을 추가
     driver: bridge
 
 volumes:
