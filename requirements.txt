@@ -12,3 +12,4 @@ whitenoise
 gunicorn
 psycopg2-binary
 requests
+django-prometheus==2.3.1
