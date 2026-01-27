@@ -13,6 +13,13 @@ ALLOWED_HOSTS = [
     "law-loading-api.duckdns.org",
 ]
 
+# settings/prod.py 등에 추가
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,
+    'SECURITY_DEFINITIONS': None,
+    'PROTOCOL_SET': ['https'],  # HTTP 대신 HTTPS를 쓰도록 강제
+}
+
 # 3. Traefik(HTTPS) 인식 설정: Mixed Content 에러 해결의 핵심
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
