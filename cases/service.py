@@ -49,20 +49,21 @@ class GeminiService:
         return cls._llm
 
     @classmethod
-    def create_embedding(cls, content: str) -> List[float]:
-
+    def create_embedding(cls, content: str, is_query: bool = True) -> List[float]:
         api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
-
         client = genai.Client(api_key=api_key)
+
+        # 검색 쿼리인지, 저장용 문서인지에 따라 task_type 분기
+        task_type = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
 
         embedding_result = client.models.embed_content(
             model=EMBEDDING_MODEL,
-            contents=content
+            contents=content,
+            config={
+                "task_type": task_type
+            }
         )
 
-        # 응답 구조 확인 및 임베딩 추출
         if not embedding_result.embeddings:
             raise ValueError("임베딩 결과를 찾을 수 없습니다.")
 

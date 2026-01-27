@@ -4,7 +4,7 @@ import logging
 import re
 from pathlib import Path
 from typing import List, Dict, Any
-
+from cases.service import GeminiService
 import google.genai as genai
 from opensearchpy import OpenSearch, RequestsHttpConnection
 
@@ -110,7 +110,7 @@ def index_documents():
             chunks = smart_split(target_texts)
 
             for i, chunk in enumerate(chunks):
-                res = genai_client.models.embed_content(model=EMBEDDING_MODEL, contents=chunk)
+                embedding_vector = GeminiService.create_embedding(chunk, is_query=False)
 
                 chunk_body = {
                     "id": case_no,  # case_no 대신 id
@@ -122,7 +122,7 @@ def index_documents():
                     "date": data.get("judmnAdjuDe"),  # 선고일자
                     "preview": data.get("jdgmn"),  # 미리보기 텍스트
                     "chunk_content": chunk,  # 검색된 텍스트 조각
-                    "content_embedding": res.embeddings[0].values
+                    "content_embedding": embedding_vector
                 }
 
                 opensearch_client.index(
