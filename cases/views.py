@@ -6,17 +6,37 @@ from drf_yasg import openapi
 import logging
 
 from .models import Case, Category
-from .serializers import (
-    CaseSerializer, 
-    CaseAnswerApiResponseSerializer,
-    CaseSearchResponseSerializer,
-    PrecedentDetailResponseSerializer
-)
+from .serializers import *
 from .service import GeminiService, OpenSearchService
 
+# 1. 초기 데이터 조회 (Init)
+class InitDataAPIView(APIView):
+    @swagger_auto_schema(
+        operation_id="a_init_data",
+        responses={
+            200: InitDataSerializer(many=True),
+            500: openapi.Response(description="서버 오류")
+        },
+        operation_summary="초기 데이터 조회 (카테고리 및 질문)",
+        operation_description="프론트엔드 초기 렌더링 시 필요한 카테고리별 질문 리스트를 조회합니다.",
+        tags=["cases"]
+    )
+    def get(self, request):
+        try:
+            # is_deleted가 False인 카테고리만 가져오기
+            categories = Category.objects.filter(is_deleted=False).prefetch_related('questions')
+            serializer = InitDataSerializer(categories, many=True)
+            # 이전 에러 수정: status.status -> status
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logging.error(f"Init Error: {str(e)}")
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# 2. 유사 판례 검색 및 상황 저장 (Search)
 class CaseSearchView(APIView):
     @swagger_auto_schema(
+        operation_id="b_case_search",
         request_body=CaseSerializer,
         responses={
             201: CaseSearchResponseSerializer,
@@ -60,11 +80,13 @@ class CaseSearchView(APIView):
 
         except Exception as e:
             logging.error(f"Search Error: {str(e)}")
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# 3. 판례 상세 조회 및 AI 분석 (Detail)
 class PrecedentDetailView(APIView):
     @swagger_auto_schema(
+        operation_id="c_precedent_detail",
         manual_parameters=[
             openapi.Parameter(
                 'precedents_id',
@@ -75,33 +97,7 @@ class PrecedentDetailView(APIView):
             )
         ],
         responses={
-            200: openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    "status": openapi.Schema(type=openapi.TYPE_STRING, example="success"),
-                    "data": openapi.Schema(
-                        type=openapi.TYPE_OBJECT,
-                        properties={
-                            "case_no": openapi.Schema(type=openapi.TYPE_STRING, example="2023도1234"),
-                            "court": openapi.Schema(type=openapi.TYPE_STRING, example="대법원"),
-                            "case_name": openapi.Schema(type=openapi.TYPE_STRING, example="손해배상(기)"),
-                            "judgment_date": openapi.Schema(type=openapi.TYPE_STRING, example="2024.01.27"),
-                            "content": openapi.Schema(type=openapi.TYPE_STRING, description="판례 전문"),
-                            "summary": openapi.Schema(
-                                type=openapi.TYPE_OBJECT,
-                                description="AI 구조화 요약 결과",
-                                properties={
-                                    "core_summary": openapi.Schema(type=openapi.TYPE_STRING, example="피고인의 상고를 기각하고 원심 판결을 확정함"),
-                                    "key_fact": openapi.Schema(type=openapi.TYPE_STRING, example="피고인이 교차로에서 전방 주시 의무를 위반하여 사고를 냄"),
-                                    "verdict": openapi.Schema(type=openapi.TYPE_STRING, example="기각 (유죄 확정)"),
-                                    "legal_point": openapi.Schema(type=openapi.TYPE_STRING, example="신뢰의 원칙 적용 범위 위반"),
-                                    "tags": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING), example=["교통사고", "주의의무", "대법원"])
-                                }
-                            )
-                        }
-                    )
-                }
-            ),
+            200: PrecedentDetailResponseSerializer,
             404: openapi.Response(description="판례를 찾을 수 없습니다.")
         },
         operation_summary="판례 상세 조회 및 AI 분석",
@@ -111,7 +107,7 @@ class PrecedentDetailView(APIView):
     def get(self, request, precedents_id):
         precedent = OpenSearchService.get_precedent_by_case_number(precedents_id)
         if not precedent:
-            return Response({"message": "판례를 찾을 수 없습니다."}, status=404)
+            return Response({"message": "판례를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
         # AI 요약 수행
         summary = GeminiService.summarize_precedent_langchain(precedent.get("content", ""))
@@ -126,11 +122,13 @@ class PrecedentDetailView(APIView):
                 "content": precedent.get("content"),
                 "summary": summary
             }
-        })
+        }, status=status.HTTP_200_OK)
 
 
+# 4. 판례 기반 심층 분석 (Answer)
 class CaseAnswerView(APIView):
     @swagger_auto_schema(
+        operation_id="d_case_answer",
         manual_parameters=[
             openapi.Parameter(
                 'precedents_id',
@@ -166,7 +164,7 @@ class CaseAnswerView(APIView):
             precedent = OpenSearchService.get_precedent_by_case_number(precedents_id)
 
             if not precedent:
-                return Response({"error": "판례 정보 없음"}, status=404)
+                return Response({"error": "판례 정보 없음"}, status=status.HTTP_404_NOT_FOUND)
 
             # 심층 분석 실행
             analysis = GeminiService.analyze_case_deeply(
@@ -174,8 +172,8 @@ class CaseAnswerView(APIView):
                 precedent.get("content", "")
             )
 
-            return Response({"status": "success", "data": analysis})
+            return Response({"status": "success", "data": analysis}, status=status.HTTP_200_OK)
         except Case.DoesNotExist:
-            return Response({"error": "사건 ID를 찾을 수 없습니다."}, status=404)
+            return Response({"error": "사건 ID를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
