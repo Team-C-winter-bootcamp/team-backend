@@ -13,7 +13,7 @@ ALLOWED_HOSTS = [
     "law-loading-api.duckdns.org",
 ]
 
-# settings/prod.py 등에 추가
+# Swagger 설정: HTTPS 환경에서 리소스 차단을 방지하기 위한 핵심 설정
 SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
     'SECURITY_DEFINITIONS': None,
@@ -21,6 +21,7 @@ SWAGGER_SETTINGS = {
 }
 
 # 3. Traefik(HTTPS) 인식 설정: Mixed Content 에러 해결의 핵심
+# 외부 프록시(Traefik)가 보낸 HTTPS 신호를 Django가 인식하게 함
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # 4. CORS 설정: Vercel 프론트엔드와 통신 허용
@@ -28,7 +29,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://lawding.vercel.app",       # 사용자님의 Vercel 주소
+    "https://lawding.vercel.app",        # 사용자님의 Vercel 주소
     "https://law-loading-api.duckdns.org", # 본인 백엔드 주소
 ]
 
@@ -71,6 +72,7 @@ OPENSEARCH_CONFIG = {
 }
 
 # 8. 정적 파일 설정
+# collectstatic 실행 시 파일이 모이는 위치
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
