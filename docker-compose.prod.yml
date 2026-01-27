@@ -3,7 +3,6 @@ services:
     image: traefik:latest
     container_name: traefik
     restart: always
-    # 네트워크 추가
     networks:
       - traefik-public
     environment:
@@ -30,12 +29,12 @@ services:
   backend:
     image: ${ECR_REPOSITORY}:${IMAGE_TAG}
     container_name: backend
-    # 동일한 네트워크 참여
+    restart: always
     networks:
       - traefik-public
+      - monitoring-net  # Prometheus가 접근할 수 있도록 추가
     env_file:
       - .env.prod
-    restart: always
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=Host(`law-loading-api.duckdns.org`)"
@@ -48,8 +47,71 @@ services:
       python manage.py migrate &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000
       "
+    healthcheck: # 들여쓰기 수정
+      test: ["CMD", "curl", "-f", "http://localhost:8000/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-# 네트워크 정의 추가
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring-net
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - monitoring-net
+      - traefik-public # 외부 접속을 위해 추가
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_DATE_FORMATS_DEFAULT_TIMEZONE=Asia/Seoul
+    depends_on:
+      - prometheus
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    networks:
+      - monitoring-net
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+# 네트워크 정의 (하나로 통합)
 networks:
   traefik-public:
     driver: bridge
+  monitoring-net:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
