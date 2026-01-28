@@ -12,7 +12,6 @@ import json
 from opensearchpy import OpenSearch, NotFoundError
 import google.genai as genai
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 환경 변수 로드
