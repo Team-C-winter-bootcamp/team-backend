@@ -70,8 +70,8 @@ jobs:
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
 
             # 3. 환경 변수 적용
-            export ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY_URI }}
-            export IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+            export ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY_URI }} > .env
+            export IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }} >> .env
 
             # 4. 배포 실행
             docker compose -f docker-compose.prod.yml down --remove-orphans
