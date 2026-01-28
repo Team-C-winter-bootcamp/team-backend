@@ -125,3 +125,8 @@ data/aihub/
 nul
 nul.*
 data
+
+.env
+.env.prod
+.env.dev
+*.env
