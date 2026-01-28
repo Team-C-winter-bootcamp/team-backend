@@ -11,24 +11,26 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# 환경변수 로드
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / "backend.env")
 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 OPENSEARCH_HOST = os.environ.get("OPENSEARCH_HOST")
 OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443))
-
 OPENSEARCH_USERNAME = os.environ.get("OPENSEARCH_USERNAME")
 OPENSEARCH_PASSWORD = os.environ.get("OPENSEARCH_PASSWORD")
+
+# 모델 설정을 환경변수에서 가져오고 정제 (models/ 제거)
+raw_embedding_model = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")
+EMBEDDING_MODEL = raw_embedding_model.replace("models/", "") if raw_embedding_model.startswith("models/") else raw_embedding_model
+VECTOR_DIMENSION = 3072
 
 if not all([OPENSEARCH_HOST, OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD]):
     raise RuntimeError("OpenSearch 환경변수가 설정되지 않았습니다.")
 
 CHUNKED_INDEX_NAME = "precedents_chunked"
 PRECEDENTS_INDEX_NAME = "precedents"
-EMBEDDING_MODEL = "models/text-embedding-004"
-VECTOR_DIMENSION = 768
-
 MERGED_DATA_DIR = Path(__file__).parent / "data" / "merged"
 
 opensearch_client = OpenSearch(
@@ -46,6 +48,7 @@ def smart_split(text_list: List[str]) -> List[str]:
     return [c.strip() for c in chunks if len(c.strip()) > 10]
 
 def create_indices():
+    # ... (인덱스 생성 로직은 기존과 동일하므로 유지) ...
     if not opensearch_client.indices.exists(index=CHUNKED_INDEX_NAME):
         body = {
             "settings": {"index": {"knn": True}},
@@ -88,17 +91,15 @@ def create_indices():
 
 def index_documents():
     json_files = list(MERGED_DATA_DIR.glob("*.json"))
-    logging.info(f"총 {len(json_files)}개 파일 인덱싱 시작")
+    logging.info(f"총 {len(json_files)}개 파일 인덱싱 시작 (모델: {EMBEDDING_MODEL})")
 
     for file_path in json_files:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # JSON 데이터 추출
             case_no = data.get("caseNo")
             if not case_no:
-                logging.warning(f"사건번호 누락: {file_path.name}")
                 continue
 
             summary_texts = [s.get("summ_contxt", "") for s in data.get("Summary", [])]
@@ -110,18 +111,19 @@ def index_documents():
             chunks = smart_split(target_texts)
 
             for i, chunk in enumerate(chunks):
+                # 환경변수에서 가져온 정제된 모델명 사용
                 embedding_vector = GeminiService.create_embedding(chunk, is_query=False)
 
                 chunk_body = {
-                    "id": case_no,  # case_no 대신 id
-                    "caseNm": data.get("caseNm"),  # case_name 대신 caseNm
-                    "title": data.get("caseTitle"),  # title 추가
-                    "category": data.get("Class_info", {}).get("class_name"),  # 형사A(생활형) 등
-                    "subcategory": data.get("Class_info", {}).get("instance_name"),  # 배임 등
-                    "court": data.get("courtNm"),  # 법원명
-                    "date": data.get("judmnAdjuDe"),  # 선고일자
-                    "preview": data.get("jdgmn"),  # 미리보기 텍스트
-                    "chunk_content": chunk,  # 검색된 텍스트 조각
+                    "id": case_no,
+                    "caseNm": data.get("caseNm"),
+                    "title": data.get("caseTitle"),
+                    "category": data.get("Class_info", {}).get("class_name"),
+                    "subcategory": data.get("Class_info", {}).get("instance_name"),
+                    "court": data.get("courtNm"),
+                    "date": data.get("judmnAdjuDe"),
+                    "preview": data.get("jdgmn"),
+                    "chunk_content": chunk,
                     "content_embedding": embedding_vector
                 }
 
@@ -131,16 +133,15 @@ def index_documents():
                     id=f"{case_no}_{i}"
                 )
 
-
             full_doc_body = {
-                "case_no": case_no,  # "2001노688"
-                "case_title": data.get("caseTitle"),  # "광주고등법원 2002. 3. 21. 선고..."
-                "case_name": data.get("caseNm"),  # "특정경제범죄가중처벌등에관한법률위반..."
-                "court": data.get("courtNm"),  # "광주고등법원"
-                "judgment_date": data.get("judmnAdjuDe"),  # "2002-03-21" (정제된 날짜)
-                "precedent_id": data.get("판례일련번호"),  # 71594 (숫자형)
-                "issue": data.get("판시사항", ""),  # 【판시사항】 전문
-                "content": data.get("판례내용", "")  # 【피고인】 전문
+                "case_no": case_no,
+                "case_title": data.get("caseTitle"),
+                "case_name": data.get("caseNm"),
+                "court": data.get("courtNm"),
+                "judgment_date": data.get("judmnAdjuDe"),
+                "precedent_id": data.get("판례일련번호"),
+                "issue": data.get("판시사항", ""),
+                "content": data.get("판례내용", "")
             }
 
             opensearch_client.index(
