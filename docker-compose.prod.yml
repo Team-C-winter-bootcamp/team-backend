@@ -32,7 +32,6 @@ services:
     restart: always
     networks:
       - traefik-public
-      - monitoring-net
     env_file:
       - .env.prod
     # Swagger 접속이 안 될 때 직접 확인하기 위해 포트 8000을 호스트에 개방합니다.
@@ -57,4 +56,3 @@ networks:
   traefik-public:
     name: traefik-public
     driver: bridge
-
