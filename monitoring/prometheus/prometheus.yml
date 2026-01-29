@@ -6,12 +6,11 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-
-  # Django 메트릭 설정이 완료되지 않았다면 아래 섹션은 주석 처리하세요.
-  # - job_name: 'django'
-  #   static_configs:
-  #     - targets: ['backend:8000']
-  #   metrics_path: /metrics
+      
+  - job_name: 'django'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: /metrics
 
   - job_name: 'cadvisor'
     static_configs:

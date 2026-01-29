@@ -12,7 +12,7 @@ from .service import GeminiService, OpenSearchService
 # 1. 초기 데이터 조회 (Init)
 class InitDataAPIView(APIView):
     @swagger_auto_schema(
-        operation_id="a_init_data",
+        operation_id="init_data",
         responses={
             200: InitDataSerializer(many=True),
             500: openapi.Response(description="서버 오류")
@@ -36,7 +36,7 @@ class InitDataAPIView(APIView):
 # 2. 유사 판례 검색 및 상황 저장 (Search)
 class CaseSearchView(APIView):
     @swagger_auto_schema(
-        operation_id="b_case_search",
+        operation_id="case_search",
         request_body=CaseSerializer,
         responses={
             201: CaseSearchResponseSerializer,
@@ -86,7 +86,7 @@ class CaseSearchView(APIView):
 # 3. 판례 상세 조회 및 AI 분석 (Detail)
 class PrecedentDetailView(APIView):
     @swagger_auto_schema(
-        operation_id="c_precedent_detail",
+        operation_id="precedent_detail",
         manual_parameters=[
             openapi.Parameter(
                 'precedents_id',
@@ -128,7 +128,7 @@ class PrecedentDetailView(APIView):
 # 4. 판례 기반 심층 분석 (Answer)
 class CaseAnswerView(APIView):
     @swagger_auto_schema(
-        operation_id="d_case_answer",
+        operation_id="case_answer",
         manual_parameters=[
             openapi.Parameter(
                 'precedents_id',
