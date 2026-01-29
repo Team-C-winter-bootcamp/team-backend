@@ -20,6 +20,11 @@ OPENSEARCH_PORT = int(os.environ.get("OPENSEARCH_PORT", 443))
 OPENSEARCH_USERNAME = os.environ.get("OPENSEARCH_USERNAME")
 OPENSEARCH_PASSWORD = os.environ.get("OPENSEARCH_PASSWORD")
 
+# OpenSearch precedents_chunked 인덱스와 통일 (gemini-embedding-001 기본 3072 → output_dimensionality로 768 사용)
+EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+EMBEDDING_DIMENSION = 768
+
+
 class GeminiService:
     _llm: Optional[ChatGoogleGenerativeAI] = None
 
@@ -59,18 +64,16 @@ class GeminiService:
             raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
             
         client = genai.Client(api_key=api_key)
-
-        # 모델명 정제 (404 Not Found 방지 핵심 로직)
-        raw_embed_model = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")
-        model = cls._clean_model_name(raw_embed_model)
-        
+        model = cls._clean_model_name(EMBEDDING_MODEL_NAME)
         task_type = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
+        # gemini-embedding-001 기본 출력은 3072차원. OpenSearch 인덱스에 맞추기 위해 output_dimensionality 명시
+        config = {"task_type": task_type, "output_dimensionality": EMBEDDING_DIMENSION}
 
         try:
             embedding_result = client.models.embed_content(
                 model=model,
                 contents=content,
-                config={"task_type": task_type}
+                config=config
             )
         except Exception as e:
             logging.error(f"Embedding API Error (Model: {model}): {str(e)}")

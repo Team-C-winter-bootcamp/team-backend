@@ -13,11 +13,18 @@ ALLOWED_HOSTS = [
     "law-loading-api.duckdns.org",
 ]
 
-# Swagger 설정: HTTPS 환경에서 리소스 차단을 방지하기 위한 핵심 설정
+# Swagger 설정: 로컬(http)에서도 스키마 로드되도록 http 포함
+# SECURITY_DEFINITIONS=None 이면 drf-yasg에서 로컬 Swagger UI 오류 발생 가능 → Bearer 유지
 SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
-    'SECURITY_DEFINITIONS': None,
-    'PROTOCOL_SET': ['https'],  # HTTP 대신 HTTPS를 쓰도록 강제
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+        }
+    },
+    'PROTOCOL_SET': ['http', 'https'],
 }
 
 # 3. Traefik(HTTPS) 인식 설정: Mixed Content 에러 해결의 핵심

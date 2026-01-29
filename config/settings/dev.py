@@ -40,7 +40,7 @@ OPENSEARCH_CONFIG = {
         'host': os.getenv('OPENSEARCH_HOST').replace('https://', '').replace('http://', ''), # 프로토콜 강제 제거
         'port': 443
     }],
-    'http_auth': (os.getenv('OPENSEARCH_USER'), os.getenv('OPENSEARCH_PASSWORD')),
+    'http_auth': (os.getenv('OPENSEARCH_USERNAME'), os.getenv('OPENSEARCH_PASSWORD')),
     'use_ssl': True,              # 변수 대신 True 하드코딩으로 테스트
     'verify_certs': True,
     'connection_class': RequestsHttpConnection,
