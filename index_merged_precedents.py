@@ -2,13 +2,12 @@ import os
 import json
 import logging
 import re
-import time
 from pathlib import Path
 from typing import List, Dict, Any, Generator
 
 # 서비스 클래스 임포트
 from cases.service import GeminiService, OpenSearchService
-from opensearchpy import helpers, RequestsHttpConnection
+from opensearchpy import helpers
 from dotenv import load_dotenv
 
 # 로깅 설정
@@ -18,87 +17,97 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 env_path = Path(__file__).parent / ".env.prod"
 load_dotenv(dotenv_path=env_path, override=True)
 
-# 설정 상수 (gemini-embedding-001 기준 768차원)
+# 설정 상수
 CHUNKED_INDEX_NAME = "precedents_chunked"
 PRECEDENTS_INDEX_NAME = "precedents"
 VECTOR_DIMENSION = 768
 MERGED_DATA_DIR = Path(__file__).parent / "data" / "merged"
 
-# OpenSearch 클라이언트 설정
 opensearch_client = OpenSearchService.get_client()
 
+# --- [전처리 유틸리티] 벡터 검색 노이즈 제거 ---
+
+def parse_date(date_str: str) -> str:
+    """날짜를 필터링용(yyyy-MM-dd)으로 정규화"""
+    if not date_str:
+        return None
+    nums = re.findall(r'\d+', str(date_str))
+    if len(nums) >= 3:
+        return f"{nums[0]}-{nums[1].zfill(2)}-{nums[2].zfill(2)}"
+    return date_str
+
+def clean_legal_text(text: str) -> str:
+    """벡터 검색에 방해되는 노이즈(태그, 이름, 사건번호 등) 제거"""
+    if not text:
+        return ""
+    
+    # 1. 특수 태그 및 헤더 제거 (예: 【판시사항】, 【판결요지】 등)
+    text = re.sub(r'【.*?】', '', text)
+    
+    # 2. 사건번호 패턴 제거 (예: 75도1003, 2023다12345 등)
+    text = re.sub(r'\d{2,4}[가-힣]{1,3}\d+', '', text)
+    
+    # 3. 날짜 패턴 제거 (텍스트 내의 날짜는 벡터 검색에 노이즈가 될 수 있음)
+    text = re.sub(r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.', '', text)
+    
+    # 4. 불필요한 공백 및 줄바꿈 정리
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 def smart_split(text_list: List[str]) -> List[str]:
-    combined_text = "\n".join([t for t in text_list if t])
-    chunks = re.split(r'[\n.]', combined_text)
-    return [c.strip() for c in chunks if len(c.strip()) > 10]
+    """텍스트 리스트를 합쳐서 의미 있는 단위로 분할"""
+    # 전처리 적용 후 결합
+    combined_text = "\n".join([clean_legal_text(t) for t in text_list if t])
+    chunks = re.split(r'[.\n]', combined_text)
+    return [c.strip() for c in chunks if len(c.strip()) > 15] # 너무 짧은 문장은 제외
 
+# --- [인덱스 설정] ---
 
 def create_indices():
-    """인덱스를 삭제하고 gemini-embedding-001 규격(768차원)으로 생성"""
-
-    # 1. precedents_chunked 인덱스 (KNN 벡터 검색용)
+    """인덱스 초기화 (변호인 필드 제외, 벡터 최적화)"""
+    
+    # 1. chunked 인덱스 (검색용)
     if opensearch_client.indices.exists(index=CHUNKED_INDEX_NAME):
-        logging.info(f"기존 인덱스 삭제: {CHUNKED_INDEX_NAME}")
         opensearch_client.indices.delete(index=CHUNKED_INDEX_NAME)
 
     chunked_body = {
-        "settings": {
-            "index": {
-                "knn": True,
-                "refresh_interval": "1s"
-            }
-        },
+        "settings": {"index": {"knn": True, "refresh_interval": "1s"}},
         "mappings": {
             "properties": {
                 "content_embedding": {
                     "type": "knn_vector",
-                    "dimension": VECTOR_DIMENSION,  # 768차원 설정
-                    "method": {
-                        "name": "hnsw",
-                        "space_type": "l2",
-                        "engine": "faiss"
-                    }
+                    "dimension": VECTOR_DIMENSION,
+                    "method": {"name": "hnsw", "space_type": "l2", "engine": "faiss"}
                 },
                 "id": {"type": "keyword"},
                 "caseNm": {"type": "text"},
-                "title": {"type": "text"},
-                "category": {"type": "keyword"},
-                "subcategory": {"type": "keyword"},
-                "court": {"type": "keyword"},
                 "date": {"type": "date", "format": "yyyy-MM-dd"},
-                "preview": {"type": "text"},
-                "chunk_content": {"type": "text"}
+                "chunk_content": {"type": "text"} # 정제된 텍스트 저장
             }
         }
     }
     opensearch_client.indices.create(index=CHUNKED_INDEX_NAME, body=chunked_body)
-    logging.info(f"768차원 KNN 인덱스 생성 완료: {CHUNKED_INDEX_NAME}")
 
-    # 2. precedents 인덱스 (원본 데이터용)
+    # 2. 원본 인덱스 (조회용)
     if not opensearch_client.indices.exists(index=PRECEDENTS_INDEX_NAME):
         precedents_body = {
             "mappings": {
                 "properties": {
                     "case_no": {"type": "keyword"},
                     "case_title": {"type": "text"},
-                    "case_name": {"type": "text"},
-                    "court": {"type": "keyword"},
                     "judgment_date": {"type": "date", "format": "yyyy-MM-dd"},
-                    "precedent_id": {"type": "integer"},
-                    "issue": {"type": "text"},
                     "content": {"type": "text"}
                 }
             }
         }
         opensearch_client.indices.create(index=PRECEDENTS_INDEX_NAME, body=precedents_body)
-        logging.info(f"원본 판례 인덱스 생성 완료: {PRECEDENTS_INDEX_NAME}")
 
+# --- [인덱싱 실행] ---
 
 def get_indexing_actions() -> Generator[Dict[str, Any], None, None]:
     json_files = list(MERGED_DATA_DIR.glob("*.json"))
-    logging.info(f"총 {len(json_files)}개 파일 처리 시작")
-
+    
     for file_path in json_files:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -107,36 +116,36 @@ def get_indexing_actions() -> Generator[Dict[str, Any], None, None]:
             case_no = data.get("caseNo")
             if not case_no: continue
 
-            # [A] 'precedents' 인덱스 데이터
+            normalized_date = parse_date(data.get("judmnAdjuDe"))
+
+            # [A] 'precedents' (원본 데이터 보존 - 변호인 필드는 아예 삭제)
             yield {
                 "_index": PRECEDENTS_INDEX_NAME,
                 "_id": str(case_no),
                 "_source": {
                     "case_no": case_no,
                     "case_title": data.get("caseTitle"),
-                    "case_name": data.get("caseNm"),
-                    "court": data.get("courtNm"),
-                    "judgment_date": data.get("judmnAdjuDe"),
-                    "precedent_id": data.get("판례일련번호"),
-                    "issue": data.get("판시사항", ""),
+                    "judgment_date": normalized_date,
                     "content": data.get("판례내용", "")
                 }
             }
 
-            # [B] 'precedents_chunked' 인덱스 데이터
+            # [B] 'precedents_chunked' (벡터 검색 최적화)
+            # 검색 품질을 높이기 위해 판시사항, 판결요지, 요약문만 사용
             summary_texts = [s.get("summ_contxt", "") for s in data.get("Summary", [])]
-            target_texts = [
-                               data.get("판시사항", ""),
-                               data.get("판결요지", ""),
-                               data.get("jdgmn", "")
-                           ] + summary_texts
-            chunks = smart_split(target_texts)
+            target_raw_texts = [
+                data.get("판시사항", ""),
+                data.get("판결요지", ""),
+                data.get("jdgmn", "")
+            ] + summary_texts
+            
+            # 노이즈 제거 및 청크 분할
+            chunks = smart_split(target_raw_texts)
 
             for i, chunk in enumerate(chunks):
                 try:
-                    # GeminiService 명세(768차원 반환)에 맞춰 호출
+                    # 임베딩 생성 (정제된 텍스트만 전달)
                     embedding_vector = GeminiService.create_embedding(chunk, is_query=False)
-
                     if embedding_vector:
                         yield {
                             "_index": CHUNKED_INDEX_NAME,
@@ -144,13 +153,8 @@ def get_indexing_actions() -> Generator[Dict[str, Any], None, None]:
                             "_source": {
                                 "id": case_no,
                                 "caseNm": data.get("caseNm"),
-                                "title": data.get("caseTitle"),
-                                "category": data.get("Class_info", {}).get("class_name"),
-                                "subcategory": data.get("Class_info", {}).get("instance_name"),
-                                "court": data.get("courtNm"),
-                                "date": data.get("judmnAdjuDe"),
-                                "preview": data.get("jdgmn"),
-                                "chunk_content": chunk,
+                                "date": normalized_date,
+                                "chunk_content": chunk, # 노이즈 없는 깨끗한 텍스트
                                 "content_embedding": embedding_vector
                             }
                         }
@@ -161,22 +165,17 @@ def get_indexing_actions() -> Generator[Dict[str, Any], None, None]:
         except Exception as e:
             logging.error(f"파일 {file_path.name} 처리 중 에러: {e}")
 
-
 def index_documents():
-    logging.info("Bulk 인덱싱 시작 (768차원 적용)")
+    logging.info("벡터 검색 최적화 인덱싱 시작...")
     success, errors = helpers.bulk(
         opensearch_client,
         get_indexing_actions(),
-        chunk_size=30,
+        chunk_size=50, # 임베딩 호출 효율을 위해 조정
         request_timeout=300,
-        raise_on_error=False,
-        raise_on_exception=False
+        raise_on_error=False
     )
-    logging.info(f"성공: {success}건, 실패: {len(errors) if isinstance(errors, list) else errors}건")
-
+    logging.info(f"성공: {success}건, 에러: {len(errors) if isinstance(errors, list) else errors}건")
 
 if __name__ == "__main__":
-    # 1. 인덱스 초기화 (768차원)
     create_indices()
-    # 2. 인덱싱 실행
     index_documents()
